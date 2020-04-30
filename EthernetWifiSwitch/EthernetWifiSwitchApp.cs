@@ -1,5 +1,7 @@
 ﻿using EthernetWifiSwitch.Properties;
 using System;
+using System.Net.NetworkInformation;
+using System.Security.Principal;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows.Forms;
@@ -12,7 +14,7 @@ namespace EthernetWifiSwitch
 
         public const string SilentExitExceptionString = "Exit";
 
-        private bool? currentlyUsingEthernet = null;
+        private bool? currentlyOnEthernet = null;
         
         private NotifyIcon trayIcon;
         MenuItem enabledMenuItem;
@@ -24,22 +26,49 @@ namespace EthernetWifiSwitch
         public EthernetWifiSwitchApp()
         {
             AppInstance = this;
-            _ = Init();
+            Init();
         }
 
-        private async Task Init()
+        private void Init()
         {
-            Thread.Sleep(1000);
+            Thread.Sleep(500);
 
-            LoadSettings();
+            if (RunningAsAdministrator())
+            {
+                LoadSettings();
 
-            trayIcon = new NotifyIcon();
-            trayIcon.Icon = Resources.SysTrayIcon;
+                trayIcon = new NotifyIcon();
+                trayIcon.Icon = Resources.SysTrayIcon;
 
-            if (settings.NetworkInterfaceSwitchingEnabled.GetValueOrDefault(false))
-                CheckForChange(this, EventArgs.Empty);
+                if (settings.NetworkInterfaceSwitchingEnabled == true)
+                {
+                    CheckForChange(this, EventArgs.Empty);
+                    
+                    /*
+                    
+                    //Set current status:
+                    currentlyOnEthernet = NetworkInterfaceDeviceSelection.IsOnline(settings.EthernetInterfaceSelection);
 
-            RefreshSysTrayMenu();
+                    //Disable Wifi if it's enabled
+                    if (currentlyOnEthernet.Value == true && NetworkInterfaceDeviceSelection.IsOnline(settings.WifiInterfaceSelection))
+                        settings.WifiInterfaceSelection.ChangeState(false);
+
+                    NetworkChange.NetworkAddressChanged += new
+                        NetworkAddressChangedEventHandler(CheckForChange);
+
+                    */
+                }
+
+
+                NetworkChange.NetworkAddressChanged += new
+                    NetworkAddressChangedEventHandler(CheckForChange);
+            }
+            else
+            {
+                MessageBox.Show("Please run Network Assistant with administrative privileges. Exiting.", "Error", MessageBoxButtons.OK, MessageBoxIcon.Exclamation);
+
+                Exit();
+            }
         }
 
         private void RefreshSysTrayMenu()
@@ -91,14 +120,16 @@ namespace EthernetWifiSwitch
         {
             // Hide tray icon, otherwise it will remain shown until user mouses over it
             if (trayIcon != null)
+            {
                 trayIcon.Visible = false;
+            }
             Application.Exit();
         }
 
         void ToggleEnabled(object sender, EventArgs e)
         {
             settings.NetworkInterfaceSwitchingEnabled = !settings.NetworkInterfaceSwitchingEnabled;
-            RefreshSysTrayMenu();
+            CheckForChange(this, EventArgs.Empty);
         }
 
         void DisplaySettings(object sender, EventArgs e)
@@ -124,12 +155,59 @@ namespace EthernetWifiSwitch
 
         private void CheckForChange(object sender, EventArgs e)
         {
+            NetworkInterfaceDeviceSelection.LoadAllNetworkInterfaceSelections(settings);
 
+            if (NetworkInterfaceDeviceSelection.IsOnline(settings.EthernetInterfaceSelection))
+            {
+                NetworkChange.NetworkAddressChanged -= new
+                    NetworkAddressChangedEventHandler(CheckForChange);
+
+                settings.WifiInterfaceSelection.ChangeState(false);
+
+                NetworkChange.NetworkAddressChanged += new
+                    NetworkAddressChangedEventHandler(CheckForChange);
+
+                currentlyOnEthernet = true;
+
+                RefreshSysTrayMenu();
+            }
+            else
+            {
+                currentlyOnEthernet = false;
+
+                if (!NetworkInterfaceDeviceSelection.IsOnline(settings.WifiInterfaceSelection))
+                {
+                    NetworkChange.NetworkAddressChanged -= new
+                    NetworkAddressChangedEventHandler(CheckForChange);
+
+                    settings.WifiInterfaceSelection.ChangeState(true);
+
+                    NetworkChange.NetworkAddressChanged += new
+                    NetworkAddressChangedEventHandler(CheckForChange);
+                }
+            }
+
+            if (currentlyOnEthernet.Value == true && !NetworkInterfaceDeviceSelection.IsOnline(settings.EthernetInterfaceSelection)) 
+            {
+                NetworkChange.NetworkAddressChanged -= new
+                    NetworkAddressChangedEventHandler(CheckForChange);
+
+                settings.WifiInterfaceSelection.ChangeState(true);
+
+                NetworkChange.NetworkAddressChanged += new
+                    NetworkAddressChangedEventHandler(CheckForChange);
+
+                currentlyOnEthernet = false;
+
+                RefreshSysTrayMenu();
+            }
+            
         }
 
-        private void PerformNetworkInterfaceSwitch()
+        public static bool RunningAsAdministrator()
         {
-
+            return (new WindowsPrincipal(WindowsIdentity.GetCurrent()))
+                      .IsInRole(WindowsBuiltInRole.Administrator);
         }
     }
 }

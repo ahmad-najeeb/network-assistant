@@ -75,7 +75,7 @@ namespace EthernetWifiSwitch
                 || NetworkInterfaceDeviceSelection.AllWifiNetworkInterfaceSelections.Count == 0)
             {
                 MessageBox.Show("Settings", "Your system doesn't have Wifi and/or Ethernet adapters. Exiting.", MessageBoxButtons.OK, MessageBoxIcon.Error);
-                EthernetWifiSwitchApp.AppInstance.Exit();
+                EthernetWifiSwitchApp.AppInstance.Exit(); //TODO: Doesn't work yet
             }
 
             if (!allSettingsValidAndPresent())

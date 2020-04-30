@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using System.Net.NetworkInformation;
 using System.Runtime.Serialization;
@@ -17,41 +18,46 @@ namespace EthernetWifiSwitch
         [DataMember]
         string physicalAddress;
 
+        [DataMember]
+        readonly string name;
+
+        [DataMember]
+        string description;
+
         public static List<NetworkInterfaceDeviceSelection> AllEthernetNetworkInterfaceSelections = null;
         public static List<NetworkInterfaceDeviceSelection> AllWifiNetworkInterfaceSelections = null;
 
         public bool IsActualNetworkInterface = false;
+        
 
-        String name;
-        String operationalStatus;
+        NetworkInterface networkInterfaceInstance = null;
+
+        //public OperationalStatus OperationalStatus { get; set; }
 
         public NetworkInterfaceDeviceSelection()
         {
 
         }
 
+        
+
         public NetworkInterfaceDeviceSelection(NetworkInterface nic, bool doNotAutoDiscard = false)
         {
             this.DoNotAutoDiscard = doNotAutoDiscard;
-            name = nic.Description;
-            operationalStatus = nic.OperationalStatus.ToString();
-            physicalAddress = nic.GetPhysicalAddress().ToString();
+            networkInterfaceInstance = nic;
+            name = nic.Name;
+            description = nic.Description;
+            physicalAddress = networkInterfaceInstance.GetPhysicalAddress().ToString();
             IsActualNetworkInterface = true;
-        }
-
-        private NetworkInterfaceDeviceSelection(string address, bool doNotAutoDiscard)
-        {
-            this.DoNotAutoDiscard = doNotAutoDiscard;
-            physicalAddress = address;
-            IsActualNetworkInterface = false;
         }
 
         public override string ToString()
         {
             if (IsActualNetworkInterface)
-                return $"Device: {name} | MAC: {physicalAddress} | Status: {operationalStatus}";
+                return $"Device: {name} | Description: {description} | MAC: {physicalAddress} | Status: {networkInterfaceInstance.OperationalStatus.ToString()}";
             else
-                return $"Device not currently connected with MAC: {physicalAddress}";
+                return $"Disconnected Device: {name} | Description: {description} | MAC: {physicalAddress}";
+            //return $"Device not currently connected with MAC: {physicalAddress}";
         }
 
         public static void LoadAllNetworkInterfaceSelections(Settings settingsRef = null)
@@ -78,7 +84,8 @@ namespace EthernetWifiSwitch
 
         private static List<NetworkInterfaceDeviceSelection> GetInterfaceSelections(NetworkInterfaceType interfaceType, Settings settingsRef = null)
         {
-            List<NetworkInterfaceDeviceSelection> list = NetworkInterface.GetAllNetworkInterfaces().Where(x => (x.NetworkInterfaceType == interfaceType))
+            var all = NetworkInterface.GetAllNetworkInterfaces();
+            List<NetworkInterfaceDeviceSelection> list = all.Where(x => (x.NetworkInterfaceType == interfaceType))
                 .Select(x => new NetworkInterfaceDeviceSelection(x))
                 .ToList();
 
@@ -162,6 +169,48 @@ namespace EthernetWifiSwitch
         public override int GetHashCode()
         {
             return this.physicalAddress.GetHashCode();
+        }
+
+        public void ChangeState(bool enable)
+        {
+            ProcessStartInfo psi = new ProcessStartInfo("netsh", "interface set interface \"" + name + "\" " + (enable ? "enable" : "disable"));
+            Process p = new Process();
+            p.StartInfo = psi;
+            p.Start();
+
+            /*
+
+            if (enable && networkInterfaceInstance.OperationalStatus == OperationalStatus.Down)
+            {
+                throw new Exception("Unable to bring interface UP! Current status: " + networkInterfaceInstance.OperationalStatus.ToString());
+            }
+            else if (!enable && networkInterfaceInstance.OperationalStatus == OperationalStatus.Up)
+            {
+                throw new Exception("Unable to bring interface Down! Current status: " + networkInterfaceInstance.OperationalStatus.ToString());
+            }
+
+            */
+        }
+
+        /*
+
+        public OperationalStatus? GetOperationalStatus()
+        {
+            if (IsActualNetworkInterface)
+                return networkInterfaceInstance.OperationalStatus;
+            else
+                return null;
+        }
+
+        */
+
+        public static bool IsOnline(NetworkInterfaceDeviceSelection networkInterfaceDeviceSelection)
+        {
+            if (networkInterfaceDeviceSelection.IsActualNetworkInterface
+                && networkInterfaceDeviceSelection.networkInterfaceInstance.OperationalStatus == OperationalStatus.Up)
+                return true;
+            else
+                return false;
         }
     }
 }
