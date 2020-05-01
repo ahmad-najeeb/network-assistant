@@ -5,7 +5,7 @@ using System.Linq;
 using System.Net.NetworkInformation;
 using System.Windows.Forms;
 
-namespace EthernetWifiSwitch
+namespace NetworkAssistantNamespace
 {
     public partial class SettingsForm : Form
     {

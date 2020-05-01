@@ -5,7 +5,7 @@ using System.Linq;
 using System.Net.NetworkInformation;
 using System.Runtime.Serialization;
 
-namespace EthernetWifiSwitch
+namespace NetworkAssistantNamespace
 {
     [DataContract]
     public class NetworkInterfaceDeviceSelection

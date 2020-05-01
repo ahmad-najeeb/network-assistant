@@ -2,7 +2,7 @@
 using System.Threading;
 using System.Windows.Forms;
 
-namespace EthernetWifiSwitch
+namespace NetworkAssistantNamespace
 {
     public static class Program
     {

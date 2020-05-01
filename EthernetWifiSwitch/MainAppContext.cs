@@ -1,11 +1,11 @@
-﻿using EthernetWifiSwitch.Properties;
+﻿using NetworkAssistantNamespace.Properties;
 using System;
 using System.Net.NetworkInformation;
 using System.Security.Principal;
 using System.Threading;
 using System.Windows.Forms;
 
-namespace EthernetWifiSwitch
+namespace NetworkAssistantNamespace
 {
     public class MainAppContext : ApplicationContext
     {

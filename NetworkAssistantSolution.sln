@@ -3,7 +3,7 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 16
 VisualStudioVersion = 16.0.29411.108
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "EthernetWifiSwitch", "EthernetWifiSwitch\EthernetWifiSwitch.csproj", "{E69D649D-5556-460C-B3BF-CC3B1254E6AC}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "NetworkAssistant", "EthernetWifiSwitch\NetworkAssistant.csproj", "{E69D649D-5556-460C-B3BF-CC3B1254E6AC}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution

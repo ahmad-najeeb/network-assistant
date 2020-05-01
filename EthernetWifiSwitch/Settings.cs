@@ -4,7 +4,7 @@ using System.IO;
 using System.Runtime.Serialization;
 using System.Windows.Forms;
 
-namespace EthernetWifiSwitch
+namespace NetworkAssistantNamespace
 {
     [DataContract]
     public class Settings

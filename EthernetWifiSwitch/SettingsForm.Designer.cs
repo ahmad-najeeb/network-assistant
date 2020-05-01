@@ -1,4 +1,4 @@
-﻿namespace EthernetWifiSwitch
+﻿namespace NetworkAssistantNamespace
 {
     partial class SettingsForm
     {

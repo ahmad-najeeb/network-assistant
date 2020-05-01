@@ -6,8 +6,8 @@
     <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
     <ProjectGuid>{E69D649D-5556-460C-B3BF-CC3B1254E6AC}</ProjectGuid>
     <OutputType>WinExe</OutputType>
-    <RootNamespace>EthernetWifiSwitch</RootNamespace>
-    <AssemblyName>EthernetWifiSwitch</AssemblyName>
+    <RootNamespace>NetworkAssistantNamespace</RootNamespace>
+    <AssemblyName>NetworkAssistant</AssemblyName>
     <TargetFrameworkVersion>v4.7.2</TargetFrameworkVersion>
     <FileAlignment>512</FileAlignment>
     <AutoGenerateBindingRedirects>true</AutoGenerateBindingRedirects>
@@ -50,7 +50,7 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="EthernetWifiSwitchApp.cs" />
+    <Compile Include="MainAppContext.cs" />
     <Compile Include="NetworkInterfaceDeviceSelection.cs" />
     <Compile Include="Program.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
