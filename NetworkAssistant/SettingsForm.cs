@@ -19,37 +19,7 @@ namespace NetworkAssistantNamespace
             this.settingsRef = settings;
             this.needToInitializeSettings = needToInitializeSettings;
 
-            EthernetComboBox.Items.Clear();
-            WifiComboBox.Items.Clear();
-
-            EthernetComboBox.Items.AddRange(NetworkInterfaceDeviceSelection.AllEthernetNetworkInterfaceSelections.ToArray());
-            WifiComboBox.Items.AddRange(NetworkInterfaceDeviceSelection.AllWifiNetworkInterfaceSelections.ToArray());
-
-            ReloadOldSettings();
-
-            if (EthernetComboBox.SelectedIndex == -1)
-            {
-                EthernetDoNotAutoDiscardCheckBox.Checked = false;
-                EthernetDoNotAutoDiscardCheckBox.Enabled = false;
-            }
-            else if (((NetworkInterfaceDeviceSelection)EthernetComboBox.SelectedItem).IsActualNetworkInterface == false) {
-                EthernetDoNotAutoDiscardCheckBox.Enabled = false;
-            }
-
-            if (WifiComboBox.SelectedIndex == -1)
-            {
-                WifiDoNotAutoDiscardCheckBox.Checked = false;
-                WifiDoNotAutoDiscardCheckBox.Enabled = false;
-            }
-            else if (((NetworkInterfaceDeviceSelection)WifiComboBox.SelectedItem).IsActualNetworkInterface == false)
-            {
-                WifiDoNotAutoDiscardCheckBox.Enabled = false;
-            }
-
-            if (EthernetComboBox.SelectedIndex == -1 || WifiComboBox.SelectedIndex == -1)
-            {
-                this.needToInitializeSettings = true;
-            }   
+            RefreshNetworkSelectionChoices(!this.needToInitializeSettings);
 
             ShowDialog();
             return changesDone;
@@ -148,7 +118,46 @@ namespace NetworkAssistantNamespace
 
         private void ReDetectNetworkInterfacesButton_Click(object sender, EventArgs e)
         {
-            //TODO
+            RefreshNetworkSelectionChoices(true);
+        }
+
+        private void RefreshNetworkSelectionChoices(bool doNetworkSelectionsReload)
+        {
+            if (doNetworkSelectionsReload)
+                NetworkInterfaceDeviceSelection.LoadAllNetworkInterfaceSelections(settingsRef);
+
+            EthernetComboBox.Items.Clear();
+            WifiComboBox.Items.Clear();
+
+            EthernetComboBox.Items.AddRange(NetworkInterfaceDeviceSelection.AllEthernetNetworkInterfaceSelections.ToArray());
+            WifiComboBox.Items.AddRange(NetworkInterfaceDeviceSelection.AllWifiNetworkInterfaceSelections.ToArray());
+
+            ReloadOldSettings();
+
+            if (EthernetComboBox.SelectedIndex == -1)
+            {
+                EthernetDoNotAutoDiscardCheckBox.Checked = false;
+                EthernetDoNotAutoDiscardCheckBox.Enabled = false;
+            }
+            else if (((NetworkInterfaceDeviceSelection)EthernetComboBox.SelectedItem).IsActualNetworkInterface == false)
+            {
+                EthernetDoNotAutoDiscardCheckBox.Enabled = false;
+            }
+
+            if (WifiComboBox.SelectedIndex == -1)
+            {
+                WifiDoNotAutoDiscardCheckBox.Checked = false;
+                WifiDoNotAutoDiscardCheckBox.Enabled = false;
+            }
+            else if (((NetworkInterfaceDeviceSelection)WifiComboBox.SelectedItem).IsActualNetworkInterface == false)
+            {
+                WifiDoNotAutoDiscardCheckBox.Enabled = false;
+            }
+
+            if (EthernetComboBox.SelectedIndex == -1 || WifiComboBox.SelectedIndex == -1)
+            {
+                this.needToInitializeSettings = true;
+            }
         }
 
         private void EthernetComboBox_SelectedIndexChanged(object sender, EventArgs e)

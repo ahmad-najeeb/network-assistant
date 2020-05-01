@@ -57,25 +57,16 @@ namespace NetworkAssistantNamespace
 
         private void RefreshSystemTrayMenu()
         {
-            enabledMenuItem.Checked = settings.NetworkInterfaceSwitchingEnabled.GetValueOrDefault(false);
+            enabledMenuItem.Checked = settings.NetworkInterfaceSwitchingEnabled.Value;
 
             if (enabledMenuItem.Checked)
             {
                 currentConnectionMenuItem.Visible = true;
-                currentConnectionMenuItem.Text = "      Current: " + "Wifi";
+                currentConnectionMenuItem.Text = "      Current: " + (currentlyOnEthernet.Value ? "Ethernet" : "Wifi");
             } else
             {
                 currentConnectionMenuItem.Visible = false;
             }
-
-            trayIcon.Visible = true;
-
-            trayIcon.ContextMenu = new ContextMenu(new MenuItem[] {
-                    enabledMenuItem,
-                    currentConnectionMenuItem,
-                    settingsMenuItem,
-                    exitMenuItem
-                    });
         }
 
         public void ExitImmediately()
@@ -105,6 +96,7 @@ namespace NetworkAssistantNamespace
         {
             settings.NetworkInterfaceSwitchingEnabled = !settings.NetworkInterfaceSwitchingEnabled;
             CheckForChangeAndPerformUpdatesIfNeeded(this, EventArgs.Empty);
+            RefreshSystemTrayMenu();
         }
 
         void DisplaySettingsWindow(object sender, EventArgs e)
@@ -130,15 +122,12 @@ namespace NetworkAssistantNamespace
 
         private void CheckForChangeAndPerformUpdatesIfNeeded(object sender, EventArgs e)
         {
-            bool changeDone = false;
-            
             NetworkInterfaceDeviceSelection.LoadAllNetworkInterfaceSelections(settings);
 
             if (NetworkInterfaceDeviceSelection.IsOnline(settings.EthernetInterfaceSelection))
             {
                 MakeInterfaceChange(settings.WifiInterfaceSelection, InterfaceChangeNeeded.Disable);
                 currentlyOnEthernet = true;
-                changeDone = true;
             }
             else
             {
@@ -147,7 +136,6 @@ namespace NetworkAssistantNamespace
                 if (!NetworkInterfaceDeviceSelection.IsOnline(settings.WifiInterfaceSelection))
                 {
                     MakeInterfaceChange(settings.WifiInterfaceSelection, InterfaceChangeNeeded.Enable);
-                    changeDone = true;
                 }
             }
 
@@ -156,9 +144,6 @@ namespace NetworkAssistantNamespace
                 MakeInterfaceChange(settings.WifiInterfaceSelection, InterfaceChangeNeeded.Enable);
                 currentlyOnEthernet = false;
             }
-
-            if (changeDone)
-                RefreshSystemTrayMenu();
         }
 
         private void MakeInterfaceChange(NetworkInterfaceDeviceSelection deviceSelection, InterfaceChangeNeeded changeNeeded)
@@ -195,6 +180,17 @@ namespace NetworkAssistantNamespace
 
             if (exitMenuItem == null)
                 exitMenuItem = new MenuItem("Exit", Exit);
+
+            trayIcon.ContextMenu = new ContextMenu(new MenuItem[] {
+                    enabledMenuItem,
+                    currentConnectionMenuItem,
+                    settingsMenuItem,
+                    exitMenuItem
+                    });
+
+            RefreshSystemTrayMenu();
+
+            trayIcon.Visible = true;
         }
 
         private void StartNetworkChangeMonitoring()
