@@ -169,38 +169,19 @@ namespace NetworkAssistantNamespace
             return this.physicalAddress.GetHashCode();
         }
 
-        public void ChangeState(bool enable)
+        public void ChangeState(InterfaceChangeNeeded changeNeeded)
         {
-            ProcessStartInfo psi = new ProcessStartInfo("netsh", "interface set interface \"" + name + "\" " + (enable ? "enable" : "disable"));
-            Process p = new Process();
-            p.StartInfo = psi;
-            p.Start();
-
-            /*
-
-            if (enable && networkInterfaceInstance.OperationalStatus == OperationalStatus.Down)
+            if (changeNeeded != InterfaceChangeNeeded.Nothing)
             {
-                throw new Exception("Unable to bring interface UP! Current status: " + networkInterfaceInstance.OperationalStatus.ToString());
+                ProcessStartInfo psi = new ProcessStartInfo("netsh", "interface set interface \"" + name + "\" " + (changeNeeded == InterfaceChangeNeeded.Enable ? "enable" : "disable"));
+                
+                using (Process p = new Process())
+                {
+                    p.StartInfo = psi;
+                    p.Start();
+                }
             }
-            else if (!enable && networkInterfaceInstance.OperationalStatus == OperationalStatus.Up)
-            {
-                throw new Exception("Unable to bring interface Down! Current status: " + networkInterfaceInstance.OperationalStatus.ToString());
-            }
-
-            */
         }
-
-        /*
-
-        public OperationalStatus? GetOperationalStatus()
-        {
-            if (IsActualNetworkInterface)
-                return networkInterfaceInstance.OperationalStatus;
-            else
-                return null;
-        }
-
-        */
 
         public static bool IsOnline(NetworkInterfaceDeviceSelection networkInterfaceDeviceSelection)
         {
@@ -210,5 +191,12 @@ namespace NetworkAssistantNamespace
             else
                 return false;
         }
+    }
+
+    public enum InterfaceChangeNeeded
+    {
+        Nothing,
+        Enable,
+        Disable
     }
 }

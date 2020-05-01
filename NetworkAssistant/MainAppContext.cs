@@ -6,8 +6,7 @@ using System.Threading;
 using System.Windows.Forms;
 
 namespace NetworkAssistantNamespace
-{
-    public class MainAppContext : ApplicationContext
+{   public class MainAppContext : ApplicationContext
     {
         public static MainAppContext AppInstance = null;
 
@@ -30,63 +29,34 @@ namespace NetworkAssistantNamespace
 
         private void Init()
         {
+            bool needToExitImmediately = false;
+
             Thread.Sleep(500);
 
             if (RunningAsAdministrator())
             {
                 LoadSettings();
-
-                trayIcon = new NotifyIcon();
-                trayIcon.Icon = Resources.SysTrayIcon;
+                InitializeSystemTrayMenu();
 
                 if (settings.NetworkInterfaceSwitchingEnabled == true)
                 {
-                    CheckForChange(this, EventArgs.Empty);
-                    
-                    /*
-                    
-                    //Set current status:
-                    currentlyOnEthernet = NetworkInterfaceDeviceSelection.IsOnline(settings.EthernetInterfaceSelection);
-
-                    //Disable Wifi if it's enabled
-                    if (currentlyOnEthernet.Value == true && NetworkInterfaceDeviceSelection.IsOnline(settings.WifiInterfaceSelection))
-                        settings.WifiInterfaceSelection.ChangeState(false);
-
-                    NetworkChange.NetworkAddressChanged += new
-                        NetworkAddressChangedEventHandler(CheckForChange);
-
-                    */
+                    CheckForChangeAndPerformUpdatesIfNeeded(this, EventArgs.Empty);
                 }
 
-
-                NetworkChange.NetworkAddressChanged += new
-                    NetworkAddressChangedEventHandler(CheckForChange);
+                StartNetworkChangeMonitoring();
             }
             else
             {
                 MessageBox.Show("Please run Network Assistant with administrative privileges. Exiting.", "Error", MessageBoxButtons.OK, MessageBoxIcon.Exclamation);
-
-                Exit();
+                needToExitImmediately = true;
             }
+
+            if (needToExitImmediately)
+                ExitImmediately();
         }
 
-        private void RefreshSysTrayMenu()
+        private void RefreshSystemTrayMenu()
         {
-            if (enabledMenuItem == null)
-                enabledMenuItem = new MenuItem("Enabled", ToggleEnabled);
-
-            if (settingsMenuItem == null)
-                settingsMenuItem = new MenuItem("Settings", DisplaySettings);
-
-            if (currentConnectionMenuItem == null)
-            {
-                currentConnectionMenuItem = new MenuItem();
-                currentConnectionMenuItem.Enabled = false;
-            }
-
-            if (exitMenuItem == null)
-                exitMenuItem = new MenuItem("Exit", Exit);
-
             enabledMenuItem.Checked = settings.NetworkInterfaceSwitchingEnabled.GetValueOrDefault(false);
 
             if (enabledMenuItem.Checked)
@@ -108,7 +78,14 @@ namespace NetworkAssistantNamespace
                     });
         }
 
-        
+        public void ExitImmediately()
+        {
+            if (trayIcon != null)
+            {
+                trayIcon.Visible = false;
+            }
+            Environment.Exit(0);
+        }
 
         public void Exit()
         {
@@ -117,7 +94,6 @@ namespace NetworkAssistantNamespace
 
         private void Exit(object sender, EventArgs e)
         {
-            // Hide tray icon, otherwise it will remain shown until user mouses over it
             if (trayIcon != null)
             {
                 trayIcon.Visible = false;
@@ -125,18 +101,18 @@ namespace NetworkAssistantNamespace
             Application.Exit();
         }
 
-        void ToggleEnabled(object sender, EventArgs e)
+        void ToggleNetworkInterfaceSwitching(object sender, EventArgs e)
         {
             settings.NetworkInterfaceSwitchingEnabled = !settings.NetworkInterfaceSwitchingEnabled;
-            CheckForChange(this, EventArgs.Empty);
+            CheckForChangeAndPerformUpdatesIfNeeded(this, EventArgs.Empty);
         }
 
-        void DisplaySettings(object sender, EventArgs e)
+        void DisplaySettingsWindow(object sender, EventArgs e)
         {
             bool changesDone = settings.ShowSettingsForm(false);
 
             if (changesDone)
-                RefreshSysTrayMenu();
+                RefreshSystemTrayMenu();
         }
 
         void LoadSettings()
@@ -152,23 +128,17 @@ namespace NetworkAssistantNamespace
 
         }
 
-        private void CheckForChange(object sender, EventArgs e)
+        private void CheckForChangeAndPerformUpdatesIfNeeded(object sender, EventArgs e)
         {
+            bool changeDone = false;
+            
             NetworkInterfaceDeviceSelection.LoadAllNetworkInterfaceSelections(settings);
 
             if (NetworkInterfaceDeviceSelection.IsOnline(settings.EthernetInterfaceSelection))
             {
-                NetworkChange.NetworkAddressChanged -= new
-                    NetworkAddressChangedEventHandler(CheckForChange);
-
-                settings.WifiInterfaceSelection.ChangeState(false);
-
-                NetworkChange.NetworkAddressChanged += new
-                    NetworkAddressChangedEventHandler(CheckForChange);
-
+                MakeInterfaceChange(settings.WifiInterfaceSelection, InterfaceChangeNeeded.Disable);
                 currentlyOnEthernet = true;
-
-                RefreshSysTrayMenu();
+                changeDone = true;
             }
             else
             {
@@ -176,37 +146,67 @@ namespace NetworkAssistantNamespace
 
                 if (!NetworkInterfaceDeviceSelection.IsOnline(settings.WifiInterfaceSelection))
                 {
-                    NetworkChange.NetworkAddressChanged -= new
-                    NetworkAddressChangedEventHandler(CheckForChange);
-
-                    settings.WifiInterfaceSelection.ChangeState(true);
-
-                    NetworkChange.NetworkAddressChanged += new
-                    NetworkAddressChangedEventHandler(CheckForChange);
+                    MakeInterfaceChange(settings.WifiInterfaceSelection, InterfaceChangeNeeded.Enable);
+                    changeDone = true;
                 }
             }
 
             if (currentlyOnEthernet.Value == true && !NetworkInterfaceDeviceSelection.IsOnline(settings.EthernetInterfaceSelection)) 
             {
-                NetworkChange.NetworkAddressChanged -= new
-                    NetworkAddressChangedEventHandler(CheckForChange);
-
-                settings.WifiInterfaceSelection.ChangeState(true);
-
-                NetworkChange.NetworkAddressChanged += new
-                    NetworkAddressChangedEventHandler(CheckForChange);
-
+                MakeInterfaceChange(settings.WifiInterfaceSelection, InterfaceChangeNeeded.Enable);
                 currentlyOnEthernet = false;
-
-                RefreshSysTrayMenu();
             }
-            
+
+            if (changeDone)
+                RefreshSystemTrayMenu();
+        }
+
+        private void MakeInterfaceChange(NetworkInterfaceDeviceSelection deviceSelection, InterfaceChangeNeeded changeNeeded)
+        {
+            StopNetworkChangeMonitoring();
+
+            deviceSelection.ChangeState(changeNeeded);
+
+            StartNetworkChangeMonitoring();
         }
 
         public static bool RunningAsAdministrator()
         {
             return (new WindowsPrincipal(WindowsIdentity.GetCurrent()))
                       .IsInRole(WindowsBuiltInRole.Administrator);
+        }
+
+        private void InitializeSystemTrayMenu()
+        {
+            trayIcon = new NotifyIcon();
+            trayIcon.Icon = Resources.SysTrayIcon;
+
+            if (enabledMenuItem == null)
+                enabledMenuItem = new MenuItem("Enabled", ToggleNetworkInterfaceSwitching);
+
+            if (settingsMenuItem == null)
+                settingsMenuItem = new MenuItem("Settings", DisplaySettingsWindow);
+
+            if (currentConnectionMenuItem == null)
+            {
+                currentConnectionMenuItem = new MenuItem();
+                currentConnectionMenuItem.Enabled = false;
+            }
+
+            if (exitMenuItem == null)
+                exitMenuItem = new MenuItem("Exit", Exit);
+        }
+
+        private void StartNetworkChangeMonitoring()
+        {
+            NetworkChange.NetworkAddressChanged += new
+                    NetworkAddressChangedEventHandler(CheckForChangeAndPerformUpdatesIfNeeded);
+        }
+
+        private void StopNetworkChangeMonitoring()
+        {
+            NetworkChange.NetworkAddressChanged -= new
+                    NetworkAddressChangedEventHandler(CheckForChangeAndPerformUpdatesIfNeeded);
         }
     }
 }
