@@ -3,14 +3,13 @@ using System;
 using System.Net.NetworkInformation;
 using System.Security.Principal;
 using System.Threading;
-using System.Threading.Tasks;
 using System.Windows.Forms;
 
 namespace EthernetWifiSwitch
 {
-    public class EthernetWifiSwitchApp : ApplicationContext
+    public class MainAppContext : ApplicationContext
     {
-        public static EthernetWifiSwitchApp AppInstance = null;
+        public static MainAppContext AppInstance = null;
 
         public const string SilentExitExceptionString = "Exit";
 
@@ -23,7 +22,7 @@ namespace EthernetWifiSwitch
         MenuItem exitMenuItem;
         Settings settings = null;
 
-        public EthernetWifiSwitchApp()
+        public MainAppContext()
         {
             AppInstance = this;
             Init();

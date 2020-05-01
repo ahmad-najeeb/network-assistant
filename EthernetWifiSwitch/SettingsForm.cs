@@ -205,7 +205,7 @@ namespace EthernetWifiSwitch
                     this.FormClosing -= this.SettingsForm_FormClosing;
                     
                     e.Cancel = false;
-                    EthernetWifiSwitchApp.AppInstance.Exit();
+                    MainAppContext.AppInstance.Exit();
 
                 } else
                 {

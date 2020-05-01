@@ -1,8 +1,5 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.Linq;
 using System.Threading;
-using System.Threading.Tasks;
 using System.Windows.Forms;
 
 namespace EthernetWifiSwitch
@@ -23,7 +20,7 @@ namespace EthernetWifiSwitch
                 {
                     Application.EnableVisualStyles();
                     Application.SetCompatibleTextRenderingDefault(false);
-                    Application.Run(new EthernetWifiSwitchApp());
+                    Application.Run(new MainAppContext());
                     mtex.ReleaseMutex();
                 }
                 else

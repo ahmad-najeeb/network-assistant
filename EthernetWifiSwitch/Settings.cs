@@ -1,7 +1,6 @@
 ﻿using Newtonsoft.Json;
 using System;
 using System.IO;
-using System.Net.NetworkInformation;
 using System.Runtime.Serialization;
 using System.Windows.Forms;
 
@@ -75,7 +74,7 @@ namespace EthernetWifiSwitch
                 || NetworkInterfaceDeviceSelection.AllWifiNetworkInterfaceSelections.Count == 0)
             {
                 MessageBox.Show("Settings", "Your system doesn't have Wifi and/or Ethernet adapters. Exiting.", MessageBoxButtons.OK, MessageBoxIcon.Error);
-                EthernetWifiSwitchApp.AppInstance.Exit(); //TODO: Doesn't work yet
+                MainAppContext.AppInstance.Exit(); //TODO: Doesn't work yet
             }
 
             if (!allSettingsValidAndPresent())
