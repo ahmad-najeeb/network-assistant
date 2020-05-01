@@ -20,6 +20,6 @@
 project.lock.json
 project.assets.json
 
-EthernetWifiSwitch/bin/
-EthernetWifiSwitch/obj/
+NetworkAssistant/bin/
+NetworkAssistant/obj/
 .vs/
