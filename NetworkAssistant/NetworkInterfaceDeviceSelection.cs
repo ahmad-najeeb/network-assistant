@@ -48,6 +48,8 @@ namespace NetworkAssistantNamespace
         public static List<NetworkInterfaceDeviceSelection> AllEthernetNetworkInterfaceSelections = null;
         public static List<NetworkInterfaceDeviceSelection> AllWifiNetworkInterfaceSelections = null;
 
+        private static readonly object changeStateLock = new object();
+
         NetworkInterface networkInterfaceInstance = null;
 
         public NetworkInterfaceDeviceSelection()
@@ -114,6 +116,8 @@ namespace NetworkAssistantNamespace
 
         public bool ChangeStateIfNeeded(InterfaceChangeNeeded changeNeeded)
         {
+
+
             bool doTheChange = false;
 
             if (changeNeeded != InterfaceChangeNeeded.Nothing)
@@ -136,25 +140,24 @@ namespace NetworkAssistantNamespace
 
                 if (doTheChange)
                 {
-                    MainAppContext.AppInstance.StopNetworkChangeMonitoring();
-
-                    ProcessStartInfo psi = new ProcessStartInfo("netsh", "interface set interface \"" + name + "\" " + (changeNeeded == InterfaceChangeNeeded.Enable ? "enable" : "disable"));
-
-                    using (Process p = new Process())
+                    lock (changeStateLock)
                     {
-                        p.StartInfo = psi;
-                        p.Start();
-                        p.WaitForExit();
+                        InterfaceState previousState = CurrentState;
+
+                        MainAppContext.AppInstance.StopNetworkChangeMonitoring();
+
+                        ProcessStartInfo psi = new ProcessStartInfo("netsh", "interface set interface \"" + name + "\" " + (changeNeeded == InterfaceChangeNeeded.Enable ? "enable" : "disable"));
+
+                        using (Process p = new Process())
+                        {
+                            p.StartInfo = psi;
+                            p.Start();
+                            p.WaitForExit();
+                        }
+
+                        if (changeNeeded == InterfaceChangeNeeded.Enable)
+                            DoDelayedStatusUpdate(previousState);
                     }
-
-                    MainAppContext.AppInstance.StartNetworkChangeMonitoring();
-
-                    //Thread.Sleep(5000);
-
-                    RefreshCurrentStatus();
-
-                    if (changeNeeded == InterfaceChangeNeeded.Enable)
-                        Task.Run(() => DoDelayedStatusUpdate());
                 }
             }
 
@@ -287,26 +290,30 @@ namespace NetworkAssistantNamespace
             }
         }
 
-        private void DoDelayedStatusUpdate()
+        private void DoDelayedStatusUpdate(InterfaceState previousState)
         {
             int numberOfRetriesToGetUpdatedStatus = 3;
             int timeToWaitBetweenRetriesInMilliseconds = 4000;
 
-            InterfaceState stateBefore = CurrentState;
-
             for(int i = 0; i < numberOfRetriesToGetUpdatedStatus; i++)
             {
                 RefreshCurrentStatus();
-                if (CurrentState != stateBefore)
+                if (CurrentState != previousState)
                     break;
                 Thread.Sleep(timeToWaitBetweenRetriesInMilliseconds);
             }
 
-            if (CurrentState != stateBefore)
+            if (CurrentState != previousState)
             {
                 MessageBox.Show("Change Detected.");
                 MainAppContext.AppInstance.RefreshSystemTrayMenu();
             }
+            else
+            {
+                MessageBox.Show("Change NOT detected!", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+
+            MainAppContext.AppInstance.StartNetworkChangeMonitoring();
         }
     }
 

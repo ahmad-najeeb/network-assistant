@@ -155,6 +155,10 @@ namespace NetworkAssistantNamespace
         {
             NetworkInterfaceDeviceSelection.LoadAllNetworkInterfaceSelections(settings);
 
+            if (settings.EthernetInterfaceSelection.CurrentState == InterfaceState.Disabled)
+                settings.EthernetInterfaceSelection.ChangeStateIfNeeded(InterfaceChangeNeeded.Enable);
+
+
             if (settings.EthernetInterfaceSelection.CurrentState >= InterfaceState.HasNetworkConnectivity)
             {
                 settings.WifiInterfaceSelection.ChangeStateIfNeeded(InterfaceChangeNeeded.Disable);
