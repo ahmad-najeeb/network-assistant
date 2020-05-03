@@ -28,22 +28,6 @@ namespace NetworkAssistantNamespace
         [DataMember(Name = "wifiInterfaceSelection", EmitDefaultValue = false)]
         public NetworkInterfaceDeviceSelection WifiInterfaceSelection { get; set; } = null;
 
-        /*
-
-        [DataMember(EmitDefaultValue = false)]
-        public string ethernetInterfacePhysicalAddress { get; set; } = null;
-
-        [DataMember(EmitDefaultValue = false)]
-        public string wifiInterfacePhysicalAddress { get; set; } = null;
-
-        [DataMember(EmitDefaultValue = false)]
-        public bool? ethernetDoNotAutoDiscard { get; set; } = null;
-
-        [DataMember(EmitDefaultValue = false)]
-        public bool? wifiDoNotAutoDiscard { get; set; } = null;
-
-        */
-
         private Settings()
         {   
         }
@@ -57,24 +41,13 @@ namespace NetworkAssistantNamespace
                 NetworkInterfaceSwitchingEnabled = AutoEnableSwitcherOnStartup;
             }
 
-            /*
-
-            if (EthernetInterfaceSelection != null && EthernetInterfaceSelection.IsActualNetworkInterface == false
-                && EthernetInterfaceSelection.DoNotAutoDiscard == false)
-                EthernetInterfaceSelection = null;
-
-            if (WifiInterfaceSelection != null && WifiInterfaceSelection.IsActualNetworkInterface == false
-                && WifiInterfaceSelection.DoNotAutoDiscard == false)
-                WifiInterfaceSelection = null;
-
-            */
             NetworkInterfaceDeviceSelection.LoadAllNetworkInterfaceSelections(this);
 
             if (NetworkInterfaceDeviceSelection.AllEthernetNetworkInterfaceSelections.Count == 0
                 || NetworkInterfaceDeviceSelection.AllWifiNetworkInterfaceSelections.Count == 0)
             {
-                MessageBox.Show("Settings", "Your system doesn't have Wifi and/or Ethernet adapters. Exiting.", MessageBoxButtons.OK, MessageBoxIcon.Error);
-                MainAppContext.AppInstance.Exit(); //TODO: Doesn't work yet
+                MessageBox.Show("Your system doesn't have Wifi and/or Ethernet adapters. Exiting.", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                MainAppContext.AppInstance.ExitImmediately();
             }
 
             if (!allSettingsValidAndPresent())

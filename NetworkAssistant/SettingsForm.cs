@@ -57,7 +57,7 @@ namespace NetworkAssistantNamespace
             }
                 
             NetworkInterfaceSwitchingEnabledCheckBox.Checked = settingsRef.NetworkInterfaceSwitchingEnabled.GetValueOrDefault(false);
-            StartWithWindowsCheckbox.Checked = settingsRef.AutoStartWithWindows.GetValueOrDefault(false);
+            StartWithWindowsCheckbox.Checked = settingsRef.AutoStartWithWindows.Value;
             AutoEnableNetworkInterfaceSwitchingOnStartupCheckBox.Checked = settingsRef.AutoEnableSwitcherOnStartup.GetValueOrDefault(false);
             
             if (settingsRef.EthernetInterfaceSelection != null)
@@ -139,7 +139,7 @@ namespace NetworkAssistantNamespace
                 EthernetDoNotAutoDiscardCheckBox.Checked = false;
                 EthernetDoNotAutoDiscardCheckBox.Enabled = false;
             }
-            else if (((NetworkInterfaceDeviceSelection)EthernetComboBox.SelectedItem).IsActualNetworkInterface == false)
+            else if (((NetworkInterfaceDeviceSelection)EthernetComboBox.SelectedItem).CurrentState == InterfaceState.DevicePhysicallyDisconnected)
             {
                 EthernetDoNotAutoDiscardCheckBox.Enabled = false;
             }
@@ -149,7 +149,7 @@ namespace NetworkAssistantNamespace
                 WifiDoNotAutoDiscardCheckBox.Checked = false;
                 WifiDoNotAutoDiscardCheckBox.Enabled = false;
             }
-            else if (((NetworkInterfaceDeviceSelection)WifiComboBox.SelectedItem).IsActualNetworkInterface == false)
+            else if (((NetworkInterfaceDeviceSelection)WifiComboBox.SelectedItem).CurrentState == InterfaceState.DevicePhysicallyDisconnected)
             {
                 WifiDoNotAutoDiscardCheckBox.Enabled = false;
             }
@@ -162,12 +162,12 @@ namespace NetworkAssistantNamespace
 
         private void EthernetComboBox_SelectedIndexChanged(object sender, EventArgs e)
         {
-            EthernetDoNotAutoDiscardCheckBox.Enabled = ((NetworkInterfaceDeviceSelection)EthernetComboBox.SelectedItem).IsActualNetworkInterface;
+            EthernetDoNotAutoDiscardCheckBox.Enabled = ((NetworkInterfaceDeviceSelection)EthernetComboBox.SelectedItem).CurrentState > InterfaceState.DevicePhysicallyDisconnected;
         }
 
         private void WifiComboBox_SelectedIndexChanged(object sender, EventArgs e)
         {
-            WifiDoNotAutoDiscardCheckBox.Enabled = ((NetworkInterfaceDeviceSelection)WifiComboBox.SelectedItem).IsActualNetworkInterface;
+            WifiDoNotAutoDiscardCheckBox.Enabled = ((NetworkInterfaceDeviceSelection)WifiComboBox.SelectedItem).CurrentState > InterfaceState.DevicePhysicallyDisconnected;
         }
     }
 }

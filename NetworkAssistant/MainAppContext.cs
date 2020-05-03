@@ -6,20 +6,23 @@ using System.Threading;
 using System.Windows.Forms;
 
 namespace NetworkAssistantNamespace
-{   public class MainAppContext : ApplicationContext
+{
+    public delegate int NetworkChangeDetectionHandler(object sender, EventArgs e);
+
+    public class MainAppContext : ApplicationContext
     {
         public static MainAppContext AppInstance = null;
 
         public const string SilentExitExceptionString = "Exit";
 
-        private bool? currentlyOnEthernet = null;
-        
         private NotifyIcon trayIcon;
         MenuItem enabledMenuItem;
         MenuItem currentConnectionMenuItem;
         MenuItem settingsMenuItem;
         MenuItem exitMenuItem;
         Settings settings = null;
+
+        bool currentlyListeningForChanges = false;
 
         public MainAppContext()
         {
@@ -37,10 +40,12 @@ namespace NetworkAssistantNamespace
             {
                 LoadSettings();
                 InitializeSystemTrayMenu();
+                RefreshSystemTrayMenu();
 
                 if (settings.NetworkInterfaceSwitchingEnabled == true)
                 {
                     CheckForChangeAndPerformUpdatesIfNeeded(this, EventArgs.Empty);
+                    RefreshSystemTrayMenu();
                 }
 
                 StartNetworkChangeMonitoring();
@@ -55,14 +60,14 @@ namespace NetworkAssistantNamespace
                 ExitImmediately();
         }
 
-        private void RefreshSystemTrayMenu()
+        public void RefreshSystemTrayMenu()
         {
             enabledMenuItem.Checked = settings.NetworkInterfaceSwitchingEnabled.Value;
 
             if (enabledMenuItem.Checked)
             {
                 currentConnectionMenuItem.Visible = true;
-                currentConnectionMenuItem.Text = "      Current: " + (currentlyOnEthernet.Value ? "Ethernet" : "Wifi");
+                currentConnectionMenuItem.Text = "      Current: " + GetRefreshedConnectivityState().ToString();
             } else
             {
                 currentConnectionMenuItem.Visible = false;
@@ -75,7 +80,7 @@ namespace NetworkAssistantNamespace
             {
                 trayIcon.Visible = false;
             }
-            Environment.Exit(0);
+            Environment.Exit(0); //TODO: See if this can be avoided
         }
 
         public void Exit()
@@ -95,7 +100,15 @@ namespace NetworkAssistantNamespace
         void ToggleNetworkInterfaceSwitching(object sender, EventArgs e)
         {
             settings.NetworkInterfaceSwitchingEnabled = !settings.NetworkInterfaceSwitchingEnabled;
-            CheckForChangeAndPerformUpdatesIfNeeded(this, EventArgs.Empty);
+            if (settings.NetworkInterfaceSwitchingEnabled.Value == true)
+            {
+                CheckForChangeAndPerformUpdatesIfNeeded(this, EventArgs.Empty);
+                if (currentlyListeningForChanges == false)
+                    StartNetworkChangeMonitoring();
+            }
+            else
+                StopNetworkChangeMonitoring();
+
             RefreshSystemTrayMenu();
         }
 
@@ -103,8 +116,26 @@ namespace NetworkAssistantNamespace
         {
             bool changesDone = settings.ShowSettingsForm(false);
 
-            if (changesDone)
+            if (changesDone && settings.NetworkInterfaceSwitchingEnabled.Value == true)
+            {
                 RefreshSystemTrayMenu();
+            }
+                
+        }
+
+        private CurrentEnabledInterface GetRefreshedConnectivityState()
+        {
+            settings.EthernetInterfaceSelection.RefreshCurrentStatus();
+            settings.WifiInterfaceSelection.RefreshCurrentStatus();
+
+            if (settings.EthernetInterfaceSelection.CurrentState > InterfaceState.EnabledButNoNetworkConnectivity
+                || settings.WifiInterfaceSelection.CurrentState > InterfaceState.EnabledButNoNetworkConnectivity)
+                if (settings.EthernetInterfaceSelection.CurrentState > InterfaceState.EnabledButNoNetworkConnectivity)
+                    return CurrentEnabledInterface.Ethernet;
+                else
+                    return CurrentEnabledInterface.WIfi;
+            else
+                return CurrentEnabledInterface.None;
         }
 
         void LoadSettings()
@@ -124,35 +155,14 @@ namespace NetworkAssistantNamespace
         {
             NetworkInterfaceDeviceSelection.LoadAllNetworkInterfaceSelections(settings);
 
-            if (NetworkInterfaceDeviceSelection.IsOnline(settings.EthernetInterfaceSelection))
+            if (settings.EthernetInterfaceSelection.CurrentState >= InterfaceState.HasNetworkConnectivity)
             {
-                MakeInterfaceChange(settings.WifiInterfaceSelection, InterfaceChangeNeeded.Disable);
-                currentlyOnEthernet = true;
+                settings.WifiInterfaceSelection.ChangeStateIfNeeded(InterfaceChangeNeeded.Disable);
             }
             else
             {
-                currentlyOnEthernet = false;
-
-                if (!NetworkInterfaceDeviceSelection.IsOnline(settings.WifiInterfaceSelection))
-                {
-                    MakeInterfaceChange(settings.WifiInterfaceSelection, InterfaceChangeNeeded.Enable);
-                }
+                settings.WifiInterfaceSelection.ChangeStateIfNeeded(InterfaceChangeNeeded.Enable);
             }
-
-            if (currentlyOnEthernet.Value == true && !NetworkInterfaceDeviceSelection.IsOnline(settings.EthernetInterfaceSelection)) 
-            {
-                MakeInterfaceChange(settings.WifiInterfaceSelection, InterfaceChangeNeeded.Enable);
-                currentlyOnEthernet = false;
-            }
-        }
-
-        private void MakeInterfaceChange(NetworkInterfaceDeviceSelection deviceSelection, InterfaceChangeNeeded changeNeeded)
-        {
-            StopNetworkChangeMonitoring();
-
-            deviceSelection.ChangeState(changeNeeded);
-
-            StartNetworkChangeMonitoring();
         }
 
         public static bool RunningAsAdministrator()
@@ -193,16 +203,27 @@ namespace NetworkAssistantNamespace
             trayIcon.Visible = true;
         }
 
-        private void StartNetworkChangeMonitoring()
+        public void StartNetworkChangeMonitoring()
         {
             NetworkChange.NetworkAddressChanged += new
                     NetworkAddressChangedEventHandler(CheckForChangeAndPerformUpdatesIfNeeded);
+
+            currentlyListeningForChanges = true;
         }
 
-        private void StopNetworkChangeMonitoring()
+        public void StopNetworkChangeMonitoring()
         {
             NetworkChange.NetworkAddressChanged -= new
                     NetworkAddressChangedEventHandler(CheckForChangeAndPerformUpdatesIfNeeded);
+
+            currentlyListeningForChanges = false;
         }
+    }
+
+    enum CurrentEnabledInterface
+    {
+        None,
+        Ethernet,
+        WIfi
     }
 }
