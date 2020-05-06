@@ -6,12 +6,15 @@ namespace NetworkAssistantNamespace
 {
     public static class Program
     {
+        private static readonly NLog.Logger Logger = NLog.LogManager.GetCurrentClassLogger();
         /// <summary>
         /// The main entry point for the application.
         /// </summary>
         [STAThread]
         static void Main()
         {
+            Logger.Info("Application started");
+
             bool instanceCountOne = false;
 
             using (Mutex mtex = new Mutex(true, "MyRunningApp", out instanceCountOne))

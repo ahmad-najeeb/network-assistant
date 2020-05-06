@@ -15,6 +15,8 @@ namespace NetworkAssistantNamespace
     [DataContract]
     public class NetworkInterfaceDeviceSelection
     {
+        private static readonly NLog.Logger Logger = NLog.LogManager.GetCurrentClassLogger();
+
         private const int ethernetInterfaceTypeId = 6;
         private const int wifiInterfaceTypeId = 71;
 
@@ -40,6 +42,7 @@ namespace NetworkAssistantNamespace
 
         public InterfaceState CurrentState { get; set; }
 
+        [DataMember]
         NetworkInterfaceType networkInterfaceType;
 
         [DataMember(Name = "doNotAutoDiscard")]
@@ -48,7 +51,7 @@ namespace NetworkAssistantNamespace
         public static List<NetworkInterfaceDeviceSelection> AllEthernetNetworkInterfaceSelections = null;
         public static List<NetworkInterfaceDeviceSelection> AllWifiNetworkInterfaceSelections = null;
 
-        private static readonly object changeStateLock = new object();
+        //private static readonly object changeStateLock = new object();
 
         NetworkInterface networkInterfaceInstance = null;
 
@@ -78,6 +81,8 @@ namespace NetworkAssistantNamespace
 
         public static void LoadAllNetworkInterfaceSelections(Settings settingsRef = null)
         {
+            Logger.Info("Loading all Adapter selections ...");
+
             (AllEthernetNetworkInterfaceSelections, AllWifiNetworkInterfaceSelections) =
                 GetEthernetAndWifiTypeNetworkInterfaces(settingsRef);
         }
@@ -111,12 +116,16 @@ namespace NetworkAssistantNamespace
 
         public void RefreshCurrentStatus()
         {
+            Logger.Trace("{changeID}-{adapterType} :: Refreshing current status ...",
+                MainAppContext.ChangeIDBeingProcessed, (networkInterfaceType == NetworkInterfaceType.Ethernet ? "E" : "W"));
             LoadCurrentStatusValues(GetNetAdapterManagementObject());
         }
 
         public bool ChangeStateIfNeeded(InterfaceChangeNeeded changeNeeded)
         {
-
+            Logger.Trace("{changeID}-{adapterType}-{changeType} :: Determing if change is needed ...",
+                MainAppContext.ChangeIDBeingProcessed, (networkInterfaceType == NetworkInterfaceType.Ethernet ? "E" : "W"),
+                changeNeeded.ToString());
 
             bool doTheChange = false;
 
@@ -128,10 +137,16 @@ namespace NetworkAssistantNamespace
                 {
                     if (changeNeeded == InterfaceChangeNeeded.Enable && CurrentState < InterfaceState.EnabledButNoNetworkConnectivity)
                     {
+                        Logger.Trace("{changeID}-{adapterType}-{changeType} :: Need to perform change ...",
+                MainAppContext.ChangeIDBeingProcessed, (networkInterfaceType == NetworkInterfaceType.Ethernet ? "E" : "W"),
+                changeNeeded.ToString());
                         doTheChange = true;
                     }
                     else if (changeNeeded == InterfaceChangeNeeded.Disable && CurrentState > InterfaceState.Disabled)
                     {
+                        Logger.Trace("{changeID}-{adapterType}-{changeType} :: Need to perform change ...",
+                MainAppContext.ChangeIDBeingProcessed, (networkInterfaceType == NetworkInterfaceType.Ethernet ? "E" : "W"),
+                changeNeeded.ToString());
                         doTheChange = true;
                     }
                 }
@@ -140,24 +155,51 @@ namespace NetworkAssistantNamespace
 
                 if (doTheChange)
                 {
-                    lock (changeStateLock)
+                    Logger.Trace("{changeID}-{adapterType}-{changeType} :: Doing change ...",
+                        MainAppContext.ChangeIDBeingProcessed, (networkInterfaceType == NetworkInterfaceType.Ethernet ? "E" : "W"),
+                changeNeeded.ToString());
+                    
+                    //InterfaceState previousState = CurrentState;
+
+                    MainAppContext.AppInstance.StopNetworkChangeMonitoring();
+
+                    Logger.Trace("{changeID}-{adapterType}-{changeType} :: Executing change command ...",
+                        MainAppContext.ChangeIDBeingProcessed, (networkInterfaceType == NetworkInterfaceType.Ethernet ? "E" : "W"),
+                changeNeeded.ToString());
+
+                    ProcessStartInfo psi = new ProcessStartInfo("netsh", "interface set interface \"" + name + "\" " + (changeNeeded == InterfaceChangeNeeded.Enable ? "enable" : "disable"));
+
+                    using (Process p = new Process())
                     {
-                        InterfaceState previousState = CurrentState;
-
-                        MainAppContext.AppInstance.StopNetworkChangeMonitoring();
-
-                        ProcessStartInfo psi = new ProcessStartInfo("netsh", "interface set interface \"" + name + "\" " + (changeNeeded == InterfaceChangeNeeded.Enable ? "enable" : "disable"));
-
-                        using (Process p = new Process())
-                        {
-                            p.StartInfo = psi;
-                            p.Start();
-                            p.WaitForExit();
-                        }
-
-                        if (changeNeeded == InterfaceChangeNeeded.Enable)
-                            DoDelayedStatusUpdate(previousState);
+                        p.StartInfo = psi;
+                        p.Start();
+                        p.WaitForExit();
                     }
+
+                    
+
+                    MainAppContext.AppInstance.StartNetworkChangeMonitoring();
+
+                    
+
+                    /*
+
+                    if (changeNeeded == InterfaceChangeNeeded.Enable)
+                        DoDelayedStatusUpdate(previousState);
+
+                    */
+
+                    Logger.Trace("{changeID}-{adapterType}-{changeType} :: Change done",
+                        MainAppContext.ChangeIDBeingProcessed, (networkInterfaceType == NetworkInterfaceType.Ethernet ? "E" : "W"),
+                changeNeeded.ToString());
+
+                    RefreshCurrentStatus();
+                }
+                else
+                {
+                    Logger.Trace("{changeID}-{adapterType}-{changeType} :: Proposed change is actually NOT needed ...",
+                        MainAppContext.ChangeIDBeingProcessed, (networkInterfaceType == NetworkInterfaceType.Ethernet ? "E" : "W"),
+                changeNeeded.ToString());
                 }
             }
 
@@ -166,6 +208,9 @@ namespace NetworkAssistantNamespace
 
         private ManagementObject GetNetAdapterManagementObject()
         {
+            Logger.Trace("{changeID}-{adapterType} :: Getting Management object ...",
+                MainAppContext.ChangeIDBeingProcessed, (networkInterfaceType == NetworkInterfaceType.Ethernet ? "E" : "W"));
+
             var objectSearcher = new ManagementObjectSearcher("root\\StandardCimv2", $@"select * from MSFT_NetAdapter"); //Physical adapter
 
             string q = String.Format("select * from MSFT_NetAdapter where {0}=\"{1}\"",
@@ -178,7 +223,11 @@ namespace NetworkAssistantNamespace
                 ManagementObjectCollection collection = searcher.Get();
 
                 if (collection.Count == 0) //Device isn't currently connected to host machine
+                {
+                    Logger.Trace("{changeID}-{adapterType} :: Management object count is zero - returning null ...",
+                MainAppContext.ChangeIDBeingProcessed, (networkInterfaceType == NetworkInterfaceType.Ethernet ? "E" : "W"));
                     return null;
+                }
                 else
                 {
                     var enumerator = collection.GetEnumerator();
@@ -191,29 +240,41 @@ namespace NetworkAssistantNamespace
         private void LoadCurrentStatusValues(ManagementObject managementObject)
         {
             //TODO
+            Logger.Trace("{changeID}-{adapterType} :: Loading current state values ...",
+                MainAppContext.ChangeIDBeingProcessed, (networkInterfaceType == NetworkInterfaceType.Ethernet ? "E" : "W"));
 
             if (managementObject != null)
             {
                 //Check if device is enabled:
                 if (Int32.Parse(managementObject[managementObjectTagForCheckingIfNetworkInterfaceIsEnabled].ToString()) == 1)
                 {
+                    Logger.Trace("{changeID}-{adapterType} :: Device is enabled ...",
+                MainAppContext.ChangeIDBeingProcessed, (networkInterfaceType == NetworkInterfaceType.Ethernet ? "E" : "W"));
                     //Check if device has network connectivity:
                     if (Int32.Parse(managementObject[managementObjectTagForCheckingIfThereIsNetworkConnectivity].ToString()) == 1)
                     {
+                        Logger.Trace("{changeID}-{adapterType} :: Device has network connectivity ...",
+                MainAppContext.ChangeIDBeingProcessed, (networkInterfaceType == NetworkInterfaceType.Ethernet ? "E" : "W"));
                         CurrentState = InterfaceState.HasNetworkConnectivity;
                     }
                     else
                     {
+                        Logger.Trace("{changeID}-{adapterType} :: Device has no network connectivity ...",
+                MainAppContext.ChangeIDBeingProcessed, (networkInterfaceType == NetworkInterfaceType.Ethernet ? "E" : "W"));
                         CurrentState = InterfaceState.EnabledButNoNetworkConnectivity;
                     }
                 }
                 else
                 {
+                    Logger.Trace("{changeID}-{adapterType} :: Device is disabled ...",
+                MainAppContext.ChangeIDBeingProcessed, (networkInterfaceType == NetworkInterfaceType.Ethernet ? "E" : "W"));
                     CurrentState = InterfaceState.Disabled;
                 }
             }
             else
             {
+                Logger.Trace("{changeID}-{adapterType} :: Device is physically disconnected ...",
+                MainAppContext.ChangeIDBeingProcessed, (networkInterfaceType == NetworkInterfaceType.Ethernet ? "E" : "W"));
                 CurrentState = InterfaceState.DevicePhysicallyDisconnected;
             }
         }
@@ -292,6 +353,8 @@ namespace NetworkAssistantNamespace
 
         private void DoDelayedStatusUpdate(InterfaceState previousState)
         {
+            Logger.Trace("{changeID}-{adapterType} :: Initiating delayed status update ...",
+                MainAppContext.ChangeIDBeingProcessed, (networkInterfaceType == NetworkInterfaceType.Ethernet ? "E" : "W"));
             int numberOfRetriesToGetUpdatedStatus = 3;
             int timeToWaitBetweenRetriesInMilliseconds = 4000;
 
@@ -305,15 +368,19 @@ namespace NetworkAssistantNamespace
 
             if (CurrentState != previousState)
             {
-                MessageBox.Show("Change Detected.");
-                MainAppContext.AppInstance.RefreshSystemTrayMenu();
+                Logger.Trace("{changeID}-{adapterType} :: Change detected - Previous: {previousState}, Current: {newState} ...",
+                MainAppContext.ChangeIDBeingProcessed, (networkInterfaceType == NetworkInterfaceType.Ethernet ? "E" : "W"),
+                previousState.ToString(), CurrentState.ToString());
+                //MessageBox.Show("Change Detected.");
             }
             else
             {
-                MessageBox.Show("Change NOT detected!", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                Logger.Trace("{changeID}-{adapterType} :: Change NOT detected ...",
+                MainAppContext.ChangeIDBeingProcessed, (networkInterfaceType == NetworkInterfaceType.Ethernet ? "E" : "W"));
+                //MessageBox.Show("Change NOT detected!", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
 
-            MainAppContext.AppInstance.StartNetworkChangeMonitoring();
+            //MainAppContext.AppInstance.StartNetworkChangeMonitoring();
         }
     }
 

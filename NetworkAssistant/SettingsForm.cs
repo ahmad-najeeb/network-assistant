@@ -55,10 +55,13 @@ namespace NetworkAssistantNamespace
                     throw new Exception("Previous Wifi connection setting not found !");
                 }
             }
-                
-            NetworkInterfaceSwitchingEnabledCheckBox.Checked = settingsRef.NetworkInterfaceSwitchingEnabled.GetValueOrDefault(false);
-            StartWithWindowsCheckbox.Checked = settingsRef.AutoStartWithWindows.Value;
-            AutoEnableNetworkInterfaceSwitchingOnStartupCheckBox.Checked = settingsRef.AutoEnableSwitcherOnStartup.GetValueOrDefault(false);
+            
+            if (settingsRef.NetworkInterfaceSwitchingEnabled.HasValue)
+                NetworkInterfaceSwitchingEnabledCheckBox.Checked = settingsRef.NetworkInterfaceSwitchingEnabled.Value;
+            if (settingsRef.AutoStartWithWindows.HasValue)
+                StartWithWindowsCheckbox.Checked = settingsRef.AutoStartWithWindows.Value;
+            if (settingsRef.AutoEnableSwitcherOnStartup.HasValue)
+            AutoEnableNetworkInterfaceSwitchingOnStartupCheckBox.Checked = settingsRef.AutoEnableSwitcherOnStartup.Value;
             
             if (settingsRef.EthernetInterfaceSelection != null)
                 EthernetDoNotAutoDiscardCheckBox.Checked = settingsRef.EthernetInterfaceSelection.DoNotAutoDiscard;
