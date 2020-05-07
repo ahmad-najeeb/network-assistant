@@ -5,7 +5,6 @@ using System.Linq;
 using System.Management;
 using System.Net.NetworkInformation;
 using System.Runtime.Serialization;
-using System.Threading;
 
 namespace NetworkAssistantNamespace
 {
@@ -170,7 +169,13 @@ namespace NetworkAssistantNamespace
                         Global.ChangeIDBeingProcessed, (networkInterfaceType == NetworkInterfaceType.Ethernet ? "E" : "W"),
                 changeNeeded.ToString());
 
-                    ProcessStartInfo psi = new ProcessStartInfo("netsh", "interface set interface \"" + name + "\" " + (changeNeeded == InterfaceChangeNeeded.Enable ? "enable" : "disable"));
+                    ProcessStartInfo psi = new ProcessStartInfo()
+                    {
+                        FileName = "netsh",
+                        Arguments = "interface set interface \"" + name + "\" " + (changeNeeded == InterfaceChangeNeeded.Enable ? "enable" : "disable"),
+                        WindowStyle = ProcessWindowStyle.Hidden,
+                        CreateNoWindow = true
+                    };
 
                     using (Process p = new Process())
                     {
