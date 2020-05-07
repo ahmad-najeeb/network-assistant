@@ -21,6 +21,9 @@ namespace NetworkAssistantNamespace
         [DataMember(Name = "autoEnableSwitcherOnStartup", EmitDefaultValue = false)]
         public bool? AutoEnableSwitcherOnStartup { get; set; } = null;
 
+        [DataMember(Name = "showCurrentConnectionTypeInSystemTray", EmitDefaultValue = false)]
+        public bool? ShowCurrentConnectionTypeInSystemTray { get; set; } = null;
+
         [DataMember(Name = "ethernetInterface", EmitDefaultValue = false)]
         public NetworkInterfaceDevice EthernetInterface { get; set; } = null;
 
@@ -59,6 +62,9 @@ namespace NetworkAssistantNamespace
                 return false;
 
             if (AutoEnableSwitcherOnStartup == null)
+                return false;
+
+            if (ShowCurrentConnectionTypeInSystemTray == null)
                 return false;
 
             if (EthernetInterface == null || EthernetInterface.IsValid() == false)

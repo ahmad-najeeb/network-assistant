@@ -81,8 +81,14 @@ namespace NetworkAssistantNamespace
                 var status = GetRefreshedConnectivityState().ToString();
                 Logger.Trace("{changeID} :: Setting status text to: {statusText}", Global.ChangeIDBeingProcessed, status);
                 currentConnectionMenuItem.Text = "      Current: " + status;
+                trayIcon.Text = $"Connected to {status}"; 
             } else
+            {
                 currentConnectionMenuItem.Visible = false;
+                trayIcon.Text = "Network switching is disabled";
+            }
+
+            AssignCorrectSystemTrayIcon();
         }
 
         public void ExitImmediately()
@@ -129,11 +135,10 @@ namespace NetworkAssistantNamespace
             Logger.Info("Displaying Settings menu ...");
             bool changesDone = Global.AppSettings.ShowSettingsForm(false);
 
-            if (changesDone && Global.AppSettings.NetworkInterfaceSwitchingEnabled.Value == true)
+            if (changesDone)
             {
                 RefreshSystemTrayMenu();
-            }
-                
+            }   
         }
 
         CurrentEnabledInterface GetRefreshedConnectivityState()
@@ -259,7 +264,6 @@ namespace NetworkAssistantNamespace
             Logger.Info("Initializing system tray menu ...");
 
             trayIcon = new NotifyIcon();
-            trayIcon.Icon = Resources.SysTrayIcon;
 
             if (enabledMenuItem == null)
                 enabledMenuItem = new MenuItem("Enabled", ToggleNetworkInterfaceSwitching);
@@ -282,6 +286,21 @@ namespace NetworkAssistantNamespace
                     settingsMenuItem,
                     exitMenuItem
                     });
+        }
+
+        void AssignCorrectSystemTrayIcon()
+        {
+            CurrentEnabledInterface currentState = GetRefreshedConnectivityState();
+            if (Global.AppSettings.NetworkInterfaceSwitchingEnabled.Value == true
+                && Global.AppSettings.ShowCurrentConnectionTypeInSystemTray.Value == true)
+                if (currentState == CurrentEnabledInterface.Ethernet)
+                    trayIcon.Icon = Resources.EthernetSystemTrayIcon;
+                else if (currentState == CurrentEnabledInterface.WiFi)
+                    trayIcon.Icon = Resources.WifiSystemTrayIcon;
+                else
+                    throw new Exception($"No system tray icon to assign due to invalid connection status: {currentState}!");
+            else
+                trayIcon.Icon = Resources.GenericSystemTrayIcon;
         }
 
         public void StartNetworkChangeMonitoring()

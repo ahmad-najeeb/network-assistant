@@ -59,8 +59,10 @@ namespace NetworkAssistantNamespace
             if (Global.AppSettings.AutoStartWithWindows.HasValue)
                 StartWithWindowsCheckbox.Checked = Global.AppSettings.AutoStartWithWindows.Value;
             if (Global.AppSettings.AutoEnableSwitcherOnStartup.HasValue)
-            AutoEnableNetworkInterfaceSwitchingOnStartupCheckBox.Checked = Global.AppSettings.AutoEnableSwitcherOnStartup.Value;
-            
+                AutoEnableNetworkInterfaceSwitchingOnStartupCheckBox.Checked = Global.AppSettings.AutoEnableSwitcherOnStartup.Value;
+            if (Global.AppSettings.ShowCurrentConnectionTypeInSystemTray.HasValue)
+                ShowCurrentConnectionTypeInSystemTrayCheckBox.Checked = Global.AppSettings.ShowCurrentConnectionTypeInSystemTray.Value;
+
             if (Global.AppSettings.EthernetInterface != null)
                 EthernetDoNotAutoDiscardCheckBox.Checked = Global.AppSettings.EthernetInterface.DoNotAutoDiscard.Value;
             
@@ -73,6 +75,7 @@ namespace NetworkAssistantNamespace
             Global.AppSettings.NetworkInterfaceSwitchingEnabled = NetworkInterfaceSwitchingEnabledCheckBox.Checked;
             Global.AppSettings.AutoStartWithWindows = StartWithWindowsCheckbox.Checked;
             Global.AppSettings.AutoEnableSwitcherOnStartup = AutoEnableNetworkInterfaceSwitchingOnStartupCheckBox.Checked;
+            Global.AppSettings.ShowCurrentConnectionTypeInSystemTray = ShowCurrentConnectionTypeInSystemTrayCheckBox.Checked;
 
             ((NetworkInterfaceDevice)EthernetComboBox.SelectedItem).DoNotAutoDiscard = EthernetDoNotAutoDiscardCheckBox.Checked;
             ((NetworkInterfaceDevice)WifiComboBox.SelectedItem).DoNotAutoDiscard = WifiDoNotAutoDiscardCheckBox.Checked;
@@ -169,6 +172,11 @@ namespace NetworkAssistantNamespace
         void WifiComboBox_SelectedIndexChanged(object sender, EventArgs e)
         {
             WifiDoNotAutoDiscardCheckBox.Enabled = ((NetworkInterfaceDevice)WifiComboBox.SelectedItem).CurrentState > InterfaceState.DevicePhysicallyDisconnected;
+        }
+
+        private void CancelButton_Click(object sender, EventArgs e)
+        {
+            Close();
         }
     }
 }

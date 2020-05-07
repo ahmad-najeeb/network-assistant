@@ -63,9 +63,29 @@ namespace NetworkAssistantNamespace.Properties {
         /// <summary>
         ///   Looks up a localized resource of type System.Drawing.Icon similar to (Icon).
         /// </summary>
-        internal static System.Drawing.Icon SysTrayIcon {
+        internal static System.Drawing.Icon EthernetSystemTrayIcon {
             get {
-                object obj = ResourceManager.GetObject("SysTrayIcon", resourceCulture);
+                object obj = ResourceManager.GetObject("EthernetSystemTrayIcon", resourceCulture);
+                return ((System.Drawing.Icon)(obj));
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized resource of type System.Drawing.Icon similar to (Icon).
+        /// </summary>
+        internal static System.Drawing.Icon GenericSystemTrayIcon {
+            get {
+                object obj = ResourceManager.GetObject("GenericSystemTrayIcon", resourceCulture);
+                return ((System.Drawing.Icon)(obj));
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized resource of type System.Drawing.Icon similar to (Icon).
+        /// </summary>
+        internal static System.Drawing.Icon WifiSystemTrayIcon {
+            get {
+                object obj = ResourceManager.GetObject("WifiSystemTrayIcon", resourceCulture);
                 return ((System.Drawing.Icon)(obj));
             }
         }
