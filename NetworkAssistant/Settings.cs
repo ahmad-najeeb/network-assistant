@@ -9,10 +9,10 @@ namespace NetworkAssistantNamespace
     [DataContract]
     public class Settings
     {
+        static Settings settings = null;
+        static readonly string configFilePath = AppDomain.CurrentDomain.BaseDirectory + configFileName;
 
-        private const string configFileName = "config.json";
-        private static Settings settings = null;
-        private readonly string configFilePath = AppDomain.CurrentDomain.BaseDirectory + configFileName;
+        const string configFileName = "config.json";
 
         public bool? NetworkInterfaceSwitchingEnabled { get; set; } = null;
 
@@ -22,13 +22,13 @@ namespace NetworkAssistantNamespace
         [DataMember(Name = "autoEnableSwitcherOnStartup", EmitDefaultValue = false)]
         public bool? AutoEnableSwitcherOnStartup { get; set; } = null;
 
-        [DataMember(Name = "ethernetInterfaceSelection", EmitDefaultValue = false)]
-        public NetworkInterfaceDeviceSelection EthernetInterfaceSelection { get; set; } = null;
+        [DataMember(Name = "ethernetInterface", EmitDefaultValue = false)]
+        public NetworkInterfaceDevice EthernetInterface { get; set; } = null;
 
-        [DataMember(Name = "wifiInterfaceSelection", EmitDefaultValue = false)]
-        public NetworkInterfaceDeviceSelection WifiInterfaceSelection { get; set; } = null;
+        [DataMember(Name = "wifiInterface", EmitDefaultValue = false)]
+        public NetworkInterfaceDevice WifiInterface { get; set; } = null;
 
-        private Settings()
+        Settings()
         {   
         }
 
@@ -41,20 +41,20 @@ namespace NetworkAssistantNamespace
                 NetworkInterfaceSwitchingEnabled = AutoEnableSwitcherOnStartup;
             }
 
-            NetworkInterfaceDeviceSelection.LoadAllNetworkInterfaceSelections(this);
+            NetworkInterfaceDevice.LoadAllNetworkInterfaces(this);
 
-            if (NetworkInterfaceDeviceSelection.AllEthernetNetworkInterfaceSelections.Count == 0
-                || NetworkInterfaceDeviceSelection.AllWifiNetworkInterfaceSelections.Count == 0)
+            if (NetworkInterfaceDevice.AllEthernetNetworkInterfaces.Count == 0
+                || NetworkInterfaceDevice.AllWifiNetworkInterfaces.Count == 0)
             {
                 MessageBox.Show("Your system doesn't have Wifi and/or Ethernet adapters. Exiting.", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
                 MainAppContext.AppInstance.ExitImmediately();
             }
 
-            if (!allSettingsValidAndPresent())
+            if (!AllSettingsValidAndPresent())
                 ShowSettingsForm(true);
         }
 
-        private bool allSettingsValidAndPresent()
+        bool AllSettingsValidAndPresent()
         {
             if (AutoEnableSwitcherOnStartup == null)
                 return false;
@@ -62,10 +62,10 @@ namespace NetworkAssistantNamespace
             if (AutoEnableSwitcherOnStartup == null)
                 return false;
 
-            if (EthernetInterfaceSelection == null)
+            if (EthernetInterface == null || EthernetInterface.IsValid() == false)
                 return false;
 
-            if (WifiInterfaceSelection == null)
+            if (WifiInterface == null || WifiInterface.IsValid() == false)
                 return false;
 
             return true;
@@ -91,7 +91,7 @@ namespace NetworkAssistantNamespace
             return settings;
         }
 
-        private void WriteSettings()
+        void WriteSettings()
         {
             string json = JsonConvert.SerializeObject(settings, Formatting.Indented);
 

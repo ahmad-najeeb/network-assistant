@@ -9,40 +9,33 @@ using System.Windows.Forms;
 
 namespace NetworkAssistantNamespace
 {
-    public delegate int NetworkChangeDetectionHandler(object sender, EventArgs e);
-
     public class MainAppContext : ApplicationContext
     {
         public static string ChangeIDBeingProcessed = NullChangeID;
-
-
-        public const int ChangeIDLength = 8;
-        public const string NullChangeID = "--------";
-
-        private static readonly NLog.Logger Logger = NLog.LogManager.GetCurrentClassLogger();
-
         public static MainAppContext AppInstance = null;
 
-        public const string SilentExitExceptionString = "Exit";
+        static readonly NLog.Logger Logger = NLog.LogManager.GetCurrentClassLogger();
+        static readonly object changeHandlerLock = new object();
+        
+        const int ChangeIDLength = 8;
+        const string NullChangeID = "--------";
 
-        private NotifyIcon trayIcon;
+        bool currentlyListeningForChanges = false;
+        bool currentlyProcessingAChangeEvent = false;
+        NotifyIcon trayIcon;
         MenuItem enabledMenuItem;
         MenuItem currentConnectionMenuItem;
         MenuItem settingsMenuItem;
         MenuItem exitMenuItem;
         Settings settings = null;
-
-        bool currentlyListeningForChanges = false;
-        bool currentlyProcessingAChangeEvent = false;
-        private static readonly object changeHandlerLock = new object();
-
+        
         public MainAppContext()
         {
             AppInstance = this;
             Init();
         }
 
-        private void Init()
+        void Init()
         {
             Logger.Info("Initialization started");
 
@@ -59,7 +52,6 @@ namespace NetworkAssistantNamespace
 
                 if (settings.NetworkInterfaceSwitchingEnabled == true)
                 {
-
                     TriggerManualChangeDetection();
                     RefreshSystemTrayMenu();
 
@@ -83,7 +75,6 @@ namespace NetworkAssistantNamespace
         {
             Logger.Trace("{changeID} :: Refreshing system tray menu ...", ChangeIDBeingProcessed);
 
-
             enabledMenuItem.Checked = settings.NetworkInterfaceSwitchingEnabled.Value;
 
             if (enabledMenuItem.Checked)
@@ -93,9 +84,7 @@ namespace NetworkAssistantNamespace
                 Logger.Trace("{changeID} :: Setting status text to: {statusText}", ChangeIDBeingProcessed, status);
                 currentConnectionMenuItem.Text = "      Current: " + status;
             } else
-            {
                 currentConnectionMenuItem.Visible = false;
-            }
         }
 
         public void ExitImmediately()
@@ -109,12 +98,7 @@ namespace NetworkAssistantNamespace
             Environment.Exit(0); //TODO: See if this can be avoided
         }
 
-        public void Exit()
-        {
-            Exit(this, EventArgs.Empty);
-        }
-
-        private void Exit(object sender, EventArgs e)
+        void Exit(object sender, EventArgs e)
         {
             Logger.Info("Shutting down ...");
             NLog.LogManager.Shutdown();
@@ -154,22 +138,22 @@ namespace NetworkAssistantNamespace
                 
         }
 
-        private CurrentEnabledInterface GetRefreshedConnectivityState()
+        CurrentEnabledInterface GetRefreshedConnectivityState()
         {
             Logger.Info("Calculating current connectivity state ...");
-            settings.EthernetInterfaceSelection.RefreshCurrentStatus();
-            settings.WifiInterfaceSelection.RefreshCurrentStatus();
+            settings.EthernetInterface.RefreshCurrentStatus();
+            settings.WifiInterface.RefreshCurrentStatus();
 
-            if (settings.EthernetInterfaceSelection.CurrentState > InterfaceState.EnabledButNoNetworkConnectivity
-                || settings.WifiInterfaceSelection.CurrentState >= InterfaceState.EnabledButNoNetworkConnectivity)
-                if (settings.EthernetInterfaceSelection.CurrentState > InterfaceState.EnabledButNoNetworkConnectivity)
+            if (settings.EthernetInterface.CurrentState > InterfaceState.EnabledButNoNetworkConnectivity
+                || settings.WifiInterface.CurrentState >= InterfaceState.EnabledButNoNetworkConnectivity)
+                if (settings.EthernetInterface.CurrentState > InterfaceState.EnabledButNoNetworkConnectivity)
                     return CurrentEnabledInterface.Ethernet;
                 else
                     return CurrentEnabledInterface.WiFi;
             else
                 return CurrentEnabledInterface.None;
         }
-
+        
         void LoadSettings()
         {
             Logger.Info("Loading settings ...");
@@ -181,12 +165,7 @@ namespace NetworkAssistantNamespace
             Logger.Info("Settings loaded");
         }
 
-        private void setupAutoStartWithWIndows(bool autoStartWithWindows)
-        {
-
-        }
-
-        private void ChangeEventHandler(object sender, EventArgs e)
+        void ChangeEventHandler(object sender, EventArgs e)
         {
             Logger.Trace("Received change event fire -- spawning thread");
 
@@ -194,19 +173,7 @@ namespace NetworkAssistantNamespace
             t.Start(new List<object> { true, sender, e });
         }
 
-        /*
-
-        private void CreateChangeRequest_EventFire(object listData)
-        {   
-            Logger.Trace("Received change event fire");
-
-            
-            CreateChangeRequest_Common(true, sender, e);
-        }
-
-        */
-
-        private void CreateChangeRequest_Common(object changeData)
+        void CreateChangeRequest_Common(object changeData)
         {
             string localChangeID = GenerateChangeID();
             Logger.Trace("{localChangeID} :: Initiating COMMON change handling", $"{localChangeID}L");
@@ -246,7 +213,7 @@ namespace NetworkAssistantNamespace
             }
         }
 
-        private void TriggerManualChangeDetection()
+        void TriggerManualChangeDetection()
         {
             Logger.Trace("Received manual change detection request -- spawning thread");
 
@@ -254,29 +221,29 @@ namespace NetworkAssistantNamespace
             t.Start(new List<object> { false });
         }
 
-        private void CheckForChangeAndPerformUpdatesIfNeeded()
+        void CheckForChangeAndPerformUpdatesIfNeeded()
         {
             Logger.Trace("{changeID} :: (Re)loading Network Interfaces ...", ChangeIDBeingProcessed);
-            NetworkInterfaceDeviceSelection.LoadAllNetworkInterfaceSelections(settings);
+            NetworkInterfaceDevice.LoadAllNetworkInterfaces(settings);
 
             Logger.Trace("{changeID} :: (Re)loading Network Interfaces done", ChangeIDBeingProcessed);
             Logger.Trace("{changeID} :: Looking for changes ...", ChangeIDBeingProcessed);
 
-            if (settings.EthernetInterfaceSelection.CurrentState == InterfaceState.Disabled)
+            if (settings.EthernetInterface.CurrentState == InterfaceState.Disabled)
             {
                 Logger.Trace("{changeID} :: Ethernet is disabled so enabing it ...", ChangeIDBeingProcessed);
-                settings.EthernetInterfaceSelection.ChangeStateIfNeeded(InterfaceChangeNeeded.Enable);
+                settings.EthernetInterface.ChangeStateIfNeeded(InterfaceChangeNeeded.Enable);
             }
 
-            if (settings.EthernetInterfaceSelection.CurrentState >= InterfaceState.HasNetworkConnectivity)
+            if (settings.EthernetInterface.CurrentState >= InterfaceState.HasNetworkConnectivity)
             {
                 Logger.Trace("{changeID} :: Ethernet has connectivity so disabling Wi-Fi (if it's not already) ...", ChangeIDBeingProcessed);
-                settings.WifiInterfaceSelection.ChangeStateIfNeeded(InterfaceChangeNeeded.Disable);
+                settings.WifiInterface.ChangeStateIfNeeded(InterfaceChangeNeeded.Disable);
             }
             else
             {
                 Logger.Trace("{changeID} :: Ethernet has no connectivity so enabling Wi-Fi (if it's not already) ...", ChangeIDBeingProcessed);
-                settings.WifiInterfaceSelection.ChangeStateIfNeeded(InterfaceChangeNeeded.Enable);
+                settings.WifiInterface.ChangeStateIfNeeded(InterfaceChangeNeeded.Enable);
             }
 
             MainAppContext.AppInstance.RefreshSystemTrayMenu(); //Do this in all cases to prevent latest Wifi data from not populating
@@ -289,7 +256,7 @@ namespace NetworkAssistantNamespace
                       .IsInRole(WindowsBuiltInRole.Administrator);
         }
 
-        private void InitializeSystemTrayMenu()
+        void InitializeSystemTrayMenu()
         {
             Logger.Info("Initializing system tray menu ...");
 
@@ -340,7 +307,7 @@ namespace NetworkAssistantNamespace
             Logger.Info("*** STOPPED listening for network changes ***");
         }
 
-        private string GenerateChangeID()
+        string GenerateChangeID()
         {
             Random random = new Random();
             string chars = "abcdefghijklmnopqrstuvwxyz0123456789";
