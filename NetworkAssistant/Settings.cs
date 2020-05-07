@@ -9,7 +9,6 @@ namespace NetworkAssistantNamespace
     [DataContract]
     public class Settings
     {
-        static Settings settings = null;
         static readonly string configFilePath = AppDomain.CurrentDomain.BaseDirectory + configFileName;
 
         const string configFileName = "config.json";
@@ -41,13 +40,13 @@ namespace NetworkAssistantNamespace
                 NetworkInterfaceSwitchingEnabled = AutoEnableSwitcherOnStartup;
             }
 
-            NetworkInterfaceDevice.LoadAllNetworkInterfaces(this);
+            NetworkInterfaceDevice.LoadAllNetworkInterfaces();
 
             if (NetworkInterfaceDevice.AllEthernetNetworkInterfaces.Count == 0
                 || NetworkInterfaceDevice.AllWifiNetworkInterfaces.Count == 0)
             {
                 MessageBox.Show("Your system doesn't have Wifi and/or Ethernet adapters. Exiting.", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
-                MainAppContext.AppInstance.ExitImmediately();
+                Global.Controller.ExitImmediately();
             }
 
             if (!AllSettingsValidAndPresent())
@@ -75,7 +74,7 @@ namespace NetworkAssistantNamespace
         {
             using (SettingsForm settingsForm = new SettingsForm())
             {
-                bool changesDone = settingsForm.ShowSettings(this, needToInitializeSettings);
+                bool changesDone = settingsForm.ShowSettings(needToInitializeSettings);
                 if (changesDone)
                     WriteSettings();
 
@@ -83,17 +82,15 @@ namespace NetworkAssistantNamespace
             }
         }
 
-        public static Settings GetSettingsInstance()
+        public static void SetSettingsInstance()
         {
-            if (settings == null)
-                settings = new Settings();
-
-            return settings;
+            if (Global.AppSettings == null)
+                Global.AppSettings = new Settings();
         }
 
         void WriteSettings()
         {
-            string json = JsonConvert.SerializeObject(settings, Formatting.Indented);
+            string json = JsonConvert.SerializeObject(Global.AppSettings, Formatting.Indented);
 
             File.WriteAllText(configFilePath, json);
         }

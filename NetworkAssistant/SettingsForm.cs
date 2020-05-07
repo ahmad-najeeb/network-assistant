@@ -5,7 +5,6 @@ namespace NetworkAssistantNamespace
 {
     public partial class SettingsForm : Form
     {
-        Settings settingsRef;
         bool needToInitializeSettings = false;
         bool changesDone = false;
 
@@ -14,9 +13,8 @@ namespace NetworkAssistantNamespace
             InitializeComponent();
         }
 
-        public bool ShowSettings(Settings settings, bool needToInitializeSettings = false)
+        public bool ShowSettings(bool needToInitializeSettings = false)
         {
-            this.settingsRef = settings;
             this.needToInitializeSettings = needToInitializeSettings;
 
             RefreshNetworkInterfaceDeviceChoices(!this.needToInitializeSettings);
@@ -38,49 +36,49 @@ namespace NetworkAssistantNamespace
 
         void ReloadOldSettings()
         {
-            if (settingsRef.EthernetInterface != null)
+            if (Global.AppSettings.EthernetInterface != null)
             {
-                EthernetComboBox.SelectedItem = settingsRef.EthernetInterface;
+                EthernetComboBox.SelectedItem = Global.AppSettings.EthernetInterface;
                 if (EthernetComboBox.SelectedIndex == -1 || EthernetComboBox.SelectedItem == null)
                 {
                     throw new Exception("Previous Ethernet connection setting not found !");
                 }
             }   
             
-            if (settingsRef.WifiInterface != null)
+            if (Global.AppSettings.WifiInterface != null)
             {
-                WifiComboBox.SelectedItem = settingsRef.WifiInterface;
+                WifiComboBox.SelectedItem = Global.AppSettings.WifiInterface;
                 if (WifiComboBox.SelectedIndex == -1 || WifiComboBox.SelectedItem == null)
                 {
                     throw new Exception("Previous Wifi connection setting not found !");
                 }
             }
             
-            if (settingsRef.NetworkInterfaceSwitchingEnabled.HasValue)
-                NetworkInterfaceSwitchingEnabledCheckBox.Checked = settingsRef.NetworkInterfaceSwitchingEnabled.Value;
-            if (settingsRef.AutoStartWithWindows.HasValue)
-                StartWithWindowsCheckbox.Checked = settingsRef.AutoStartWithWindows.Value;
-            if (settingsRef.AutoEnableSwitcherOnStartup.HasValue)
-            AutoEnableNetworkInterfaceSwitchingOnStartupCheckBox.Checked = settingsRef.AutoEnableSwitcherOnStartup.Value;
+            if (Global.AppSettings.NetworkInterfaceSwitchingEnabled.HasValue)
+                NetworkInterfaceSwitchingEnabledCheckBox.Checked = Global.AppSettings.NetworkInterfaceSwitchingEnabled.Value;
+            if (Global.AppSettings.AutoStartWithWindows.HasValue)
+                StartWithWindowsCheckbox.Checked = Global.AppSettings.AutoStartWithWindows.Value;
+            if (Global.AppSettings.AutoEnableSwitcherOnStartup.HasValue)
+            AutoEnableNetworkInterfaceSwitchingOnStartupCheckBox.Checked = Global.AppSettings.AutoEnableSwitcherOnStartup.Value;
             
-            if (settingsRef.EthernetInterface != null)
-                EthernetDoNotAutoDiscardCheckBox.Checked = settingsRef.EthernetInterface.DoNotAutoDiscard.Value;
+            if (Global.AppSettings.EthernetInterface != null)
+                EthernetDoNotAutoDiscardCheckBox.Checked = Global.AppSettings.EthernetInterface.DoNotAutoDiscard.Value;
             
-            if (settingsRef.WifiInterface != null)
-                WifiDoNotAutoDiscardCheckBox.Checked = settingsRef.WifiInterface.DoNotAutoDiscard.Value;
+            if (Global.AppSettings.WifiInterface != null)
+                WifiDoNotAutoDiscardCheckBox.Checked = Global.AppSettings.WifiInterface.DoNotAutoDiscard.Value;
         }
 
         void SaveNewSettings()
         {
-            settingsRef.NetworkInterfaceSwitchingEnabled = NetworkInterfaceSwitchingEnabledCheckBox.Checked;
-            settingsRef.AutoStartWithWindows = StartWithWindowsCheckbox.Checked;
-            settingsRef.AutoEnableSwitcherOnStartup = AutoEnableNetworkInterfaceSwitchingOnStartupCheckBox.Checked;
+            Global.AppSettings.NetworkInterfaceSwitchingEnabled = NetworkInterfaceSwitchingEnabledCheckBox.Checked;
+            Global.AppSettings.AutoStartWithWindows = StartWithWindowsCheckbox.Checked;
+            Global.AppSettings.AutoEnableSwitcherOnStartup = AutoEnableNetworkInterfaceSwitchingOnStartupCheckBox.Checked;
 
             ((NetworkInterfaceDevice)EthernetComboBox.SelectedItem).DoNotAutoDiscard = EthernetDoNotAutoDiscardCheckBox.Checked;
             ((NetworkInterfaceDevice)WifiComboBox.SelectedItem).DoNotAutoDiscard = WifiDoNotAutoDiscardCheckBox.Checked;
 
-            settingsRef.EthernetInterface = (NetworkInterfaceDevice)EthernetComboBox.SelectedItem;
-            settingsRef.WifiInterface = (NetworkInterfaceDevice)WifiComboBox.SelectedItem;
+            Global.AppSettings.EthernetInterface = (NetworkInterfaceDevice)EthernetComboBox.SelectedItem;
+            Global.AppSettings.WifiInterface = (NetworkInterfaceDevice)WifiComboBox.SelectedItem;
         }
 
         bool CheckIfNewSettingsAreValid()
@@ -110,7 +108,7 @@ namespace NetworkAssistantNamespace
                     this.FormClosing -= this.SettingsForm_FormClosing;
                     
                     e.Cancel = false;
-                    MainAppContext.AppInstance.ExitImmediately();
+                    Global.Controller.ExitImmediately();
 
                 } else
                 {
@@ -127,7 +125,7 @@ namespace NetworkAssistantNamespace
         void RefreshNetworkInterfaceDeviceChoices(bool doNetworkDeviceReload)
         {
             if (doNetworkDeviceReload)
-                NetworkInterfaceDevice.LoadAllNetworkInterfaces(settingsRef);
+                NetworkInterfaceDevice.LoadAllNetworkInterfaces();
 
             EthernetComboBox.Items.Clear();
             WifiComboBox.Items.Clear();

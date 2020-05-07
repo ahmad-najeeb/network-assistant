@@ -84,12 +84,12 @@ namespace NetworkAssistantNamespace
                 return $"Disconnected Device: {deviceName} | MAC: {physicalAddress}";
         }
 
-        public static void LoadAllNetworkInterfaces(Settings settingsRef = null)
+        public static void LoadAllNetworkInterfaces()
         {
             Logger.Info("Loading all network interfaces ...");
 
             (AllEthernetNetworkInterfaces, AllWifiNetworkInterfaces) =
-                GetEthernetAndWifiTypeNetworkInterfaces(settingsRef);
+                GetEthernetAndWifiTypeNetworkInterfaces();
         }
 
         public override bool Equals(object obj)
@@ -122,14 +122,14 @@ namespace NetworkAssistantNamespace
         public void RefreshCurrentStatus()
         {
             Logger.Trace("{changeID}-{adapterType} :: Refreshing current status ...",
-                MainAppContext.ChangeIDBeingProcessed, (networkInterfaceType == NetworkInterfaceType.Ethernet ? "E" : "W"));
+                Global.ChangeIDBeingProcessed, (networkInterfaceType == NetworkInterfaceType.Ethernet ? "E" : "W"));
             LoadCurrentStatusValues(GetNetAdapterManagementObject());
         }
 
         public bool ChangeStateIfNeeded(InterfaceChangeNeeded changeNeeded)
         {
             Logger.Trace("{changeID}-{adapterType}-{changeType} :: Determing if change is needed ...",
-                MainAppContext.ChangeIDBeingProcessed, (networkInterfaceType == NetworkInterfaceType.Ethernet ? "E" : "W"),
+                Global.ChangeIDBeingProcessed, (networkInterfaceType == NetworkInterfaceType.Ethernet ? "E" : "W"),
                 changeNeeded.ToString());
 
             bool doTheChange = false;
@@ -143,14 +143,14 @@ namespace NetworkAssistantNamespace
                     if (changeNeeded == InterfaceChangeNeeded.Enable && CurrentState < InterfaceState.EnabledButNoNetworkConnectivity)
                     {
                         Logger.Trace("{changeID}-{adapterType}-{changeType} :: Need to perform change ...",
-                MainAppContext.ChangeIDBeingProcessed, (networkInterfaceType == NetworkInterfaceType.Ethernet ? "E" : "W"),
+                Global.ChangeIDBeingProcessed, (networkInterfaceType == NetworkInterfaceType.Ethernet ? "E" : "W"),
                 changeNeeded.ToString());
                         doTheChange = true;
                     }
                     else if (changeNeeded == InterfaceChangeNeeded.Disable && CurrentState > InterfaceState.Disabled)
                     {
                         Logger.Trace("{changeID}-{adapterType}-{changeType} :: Need to perform change ...",
-                MainAppContext.ChangeIDBeingProcessed, (networkInterfaceType == NetworkInterfaceType.Ethernet ? "E" : "W"),
+                Global.ChangeIDBeingProcessed, (networkInterfaceType == NetworkInterfaceType.Ethernet ? "E" : "W"),
                 changeNeeded.ToString());
                         doTheChange = true;
                     }
@@ -161,13 +161,13 @@ namespace NetworkAssistantNamespace
                 if (doTheChange)
                 {
                     Logger.Trace("{changeID}-{adapterType}-{changeType} :: Doing change ...",
-                        MainAppContext.ChangeIDBeingProcessed, (networkInterfaceType == NetworkInterfaceType.Ethernet ? "E" : "W"),
+                        Global.ChangeIDBeingProcessed, (networkInterfaceType == NetworkInterfaceType.Ethernet ? "E" : "W"),
                 changeNeeded.ToString());
-                    
-                    MainAppContext.AppInstance.StopNetworkChangeMonitoring();
+
+                    Global.Controller.StopNetworkChangeMonitoring();
 
                     Logger.Trace("{changeID}-{adapterType}-{changeType} :: Executing change command ...",
-                        MainAppContext.ChangeIDBeingProcessed, (networkInterfaceType == NetworkInterfaceType.Ethernet ? "E" : "W"),
+                        Global.ChangeIDBeingProcessed, (networkInterfaceType == NetworkInterfaceType.Ethernet ? "E" : "W"),
                 changeNeeded.ToString());
 
                     ProcessStartInfo psi = new ProcessStartInfo("netsh", "interface set interface \"" + name + "\" " + (changeNeeded == InterfaceChangeNeeded.Enable ? "enable" : "disable"));
@@ -179,10 +179,10 @@ namespace NetworkAssistantNamespace
                         p.WaitForExit();
                     }
 
-                    MainAppContext.AppInstance.StartNetworkChangeMonitoring();
+                    Global.Controller.StartNetworkChangeMonitoring();
 
                     Logger.Trace("{changeID}-{adapterType}-{changeType} :: Change done",
-                        MainAppContext.ChangeIDBeingProcessed, (networkInterfaceType == NetworkInterfaceType.Ethernet ? "E" : "W"),
+                        Global.ChangeIDBeingProcessed, (networkInterfaceType == NetworkInterfaceType.Ethernet ? "E" : "W"),
                 changeNeeded.ToString());
 
                     RefreshCurrentStatus();
@@ -190,7 +190,7 @@ namespace NetworkAssistantNamespace
                 else
                 {
                     Logger.Trace("{changeID}-{adapterType}-{changeType} :: Proposed change is actually NOT needed ...",
-                        MainAppContext.ChangeIDBeingProcessed, (networkInterfaceType == NetworkInterfaceType.Ethernet ? "E" : "W"),
+                        Global.ChangeIDBeingProcessed, (networkInterfaceType == NetworkInterfaceType.Ethernet ? "E" : "W"),
                 changeNeeded.ToString());
                 }
             }
@@ -201,7 +201,7 @@ namespace NetworkAssistantNamespace
         ManagementObject GetNetAdapterManagementObject()
         {
             Logger.Trace("{changeID}-{adapterType} :: Getting Management object ...",
-                MainAppContext.ChangeIDBeingProcessed, (networkInterfaceType == NetworkInterfaceType.Ethernet ? "E" : "W"));
+                Global.ChangeIDBeingProcessed, (networkInterfaceType == NetworkInterfaceType.Ethernet ? "E" : "W"));
 
             var objectSearcher = new ManagementObjectSearcher("root\\StandardCimv2", $@"select * from MSFT_NetAdapter"); //Physical adapter
 
@@ -217,7 +217,7 @@ namespace NetworkAssistantNamespace
                 if (collection.Count == 0) //Device isn't currently connected to host machine
                 {
                     Logger.Trace("{changeID}-{adapterType} :: Management object count is zero - returning null ...",
-                MainAppContext.ChangeIDBeingProcessed, (networkInterfaceType == NetworkInterfaceType.Ethernet ? "E" : "W"));
+                Global.ChangeIDBeingProcessed, (networkInterfaceType == NetworkInterfaceType.Ethernet ? "E" : "W"));
                     return null;
                 }
                 else
@@ -232,7 +232,7 @@ namespace NetworkAssistantNamespace
         void LoadCurrentStatusValues(ManagementObject managementObject)
         {
             Logger.Trace("{changeID}-{adapterType} :: Loading current state values ...",
-                MainAppContext.ChangeIDBeingProcessed, (networkInterfaceType == NetworkInterfaceType.Ethernet ? "E" : "W"));
+                Global.ChangeIDBeingProcessed, (networkInterfaceType == NetworkInterfaceType.Ethernet ? "E" : "W"));
 
             if (managementObject != null)
             {
@@ -240,37 +240,37 @@ namespace NetworkAssistantNamespace
                 if (Int32.Parse(managementObject[managementObjectTagForCheckingIfNetworkInterfaceIsEnabled].ToString()) == 1)
                 {
                     Logger.Trace("{changeID}-{adapterType} :: Device is enabled ...",
-                MainAppContext.ChangeIDBeingProcessed, (networkInterfaceType == NetworkInterfaceType.Ethernet ? "E" : "W"));
+                Global.ChangeIDBeingProcessed, (networkInterfaceType == NetworkInterfaceType.Ethernet ? "E" : "W"));
                     //Check if device has network connectivity:
                     if (Int32.Parse(managementObject[managementObjectTagForCheckingIfThereIsNetworkConnectivity].ToString()) == 1)
                     {
                         Logger.Trace("{changeID}-{adapterType} :: Device has network connectivity ...",
-                MainAppContext.ChangeIDBeingProcessed, (networkInterfaceType == NetworkInterfaceType.Ethernet ? "E" : "W"));
+                Global.ChangeIDBeingProcessed, (networkInterfaceType == NetworkInterfaceType.Ethernet ? "E" : "W"));
                         CurrentState = InterfaceState.HasNetworkConnectivity;
                     }
                     else
                     {
                         Logger.Trace("{changeID}-{adapterType} :: Device has no network connectivity ...",
-                MainAppContext.ChangeIDBeingProcessed, (networkInterfaceType == NetworkInterfaceType.Ethernet ? "E" : "W"));
+                Global.ChangeIDBeingProcessed, (networkInterfaceType == NetworkInterfaceType.Ethernet ? "E" : "W"));
                         CurrentState = InterfaceState.EnabledButNoNetworkConnectivity;
                     }
                 }
                 else
                 {
                     Logger.Trace("{changeID}-{adapterType} :: Device is disabled ...",
-                MainAppContext.ChangeIDBeingProcessed, (networkInterfaceType == NetworkInterfaceType.Ethernet ? "E" : "W"));
+                Global.ChangeIDBeingProcessed, (networkInterfaceType == NetworkInterfaceType.Ethernet ? "E" : "W"));
                     CurrentState = InterfaceState.Disabled;
                 }
             }
             else
             {
                 Logger.Trace("{changeID}-{adapterType} :: Device is physically disconnected ...",
-                MainAppContext.ChangeIDBeingProcessed, (networkInterfaceType == NetworkInterfaceType.Ethernet ? "E" : "W"));
+                Global.ChangeIDBeingProcessed, (networkInterfaceType == NetworkInterfaceType.Ethernet ? "E" : "W"));
                 CurrentState = InterfaceState.DevicePhysicallyDisconnected;
             }
         }
 
-        static (List<NetworkInterfaceDevice>, List<NetworkInterfaceDevice>) GetEthernetAndWifiTypeNetworkInterfaces(Settings settingsRef)
+        static (List<NetworkInterfaceDevice>, List<NetworkInterfaceDevice>) GetEthernetAndWifiTypeNetworkInterfaces()
         {
             List<NetworkInterfaceDevice> ethernetOptions = new List<NetworkInterfaceDevice>();
             List<NetworkInterfaceDevice> wifiOptions = new List<NetworkInterfaceDevice>();
@@ -291,24 +291,24 @@ namespace NetworkAssistantNamespace
                 }
             }
 
-            FindPreviousInterfaceIfAnyAndAddIfNeeded(ethernetOptions, settingsRef, NetworkInterfaceType.Ethernet);
-            FindPreviousInterfaceIfAnyAndAddIfNeeded(wifiOptions, settingsRef, NetworkInterfaceType.Wireless80211);
+            FindPreviousInterfaceIfAnyAndAddIfNeeded(ethernetOptions, NetworkInterfaceType.Ethernet);
+            FindPreviousInterfaceIfAnyAndAddIfNeeded(wifiOptions, NetworkInterfaceType.Wireless80211);
 
             return (ethernetOptions, wifiOptions);
         }
 
-        static void FindPreviousInterfaceIfAnyAndAddIfNeeded(List<NetworkInterfaceDevice> existingDevices, Settings settingsRef, NetworkInterfaceType interfaceType)
+        static void FindPreviousInterfaceIfAnyAndAddIfNeeded(List<NetworkInterfaceDevice> existingDevices, NetworkInterfaceType interfaceType)
         {
-            if (settingsRef != null
-                && ((interfaceType == NetworkInterfaceType.Ethernet && settingsRef.EthernetInterface != null)
-                || (interfaceType == NetworkInterfaceType.Wireless80211 && settingsRef.WifiInterface != null)))
+            if (Global.AppSettings != null
+                && ((interfaceType == NetworkInterfaceType.Ethernet && Global.AppSettings.EthernetInterface != null)
+                || (interfaceType == NetworkInterfaceType.Wireless80211 && Global.AppSettings.WifiInterface != null)))
             {
                 NetworkInterfaceDevice deviceToConsider;
 
                 if (interfaceType == NetworkInterfaceType.Ethernet)
-                    deviceToConsider = settingsRef.EthernetInterface;
+                    deviceToConsider = Global.AppSettings.EthernetInterface;
                 else if (interfaceType == NetworkInterfaceType.Wireless80211)
-                    deviceToConsider = settingsRef.WifiInterface;
+                    deviceToConsider = Global.AppSettings.WifiInterface;
                 else
                     throw new Exception("ERROR as2xj5 :: Invalid network interface type specfied.");
 
@@ -319,9 +319,9 @@ namespace NetworkAssistantNamespace
                     {
                         existingDevices.ElementAt(index).DoNotAutoDiscard = deviceToConsider.DoNotAutoDiscard;
                         if (interfaceType == NetworkInterfaceType.Ethernet)
-                            settingsRef.EthernetInterface = existingDevices.ElementAt(index);
+                            Global.AppSettings.EthernetInterface = existingDevices.ElementAt(index);
                         else
-                            settingsRef.WifiInterface = existingDevices.ElementAt(index);
+                            Global.AppSettings.WifiInterface = existingDevices.ElementAt(index);
                     }
                     else
                     {
@@ -333,9 +333,9 @@ namespace NetworkAssistantNamespace
                         else
                         {
                             if (interfaceType == NetworkInterfaceType.Ethernet)
-                                settingsRef.EthernetInterface = null;
+                                Global.AppSettings.EthernetInterface = null;
                             else
-                                settingsRef.WifiInterface = null;
+                                Global.AppSettings.WifiInterface = null;
                         }
                     }
                 }

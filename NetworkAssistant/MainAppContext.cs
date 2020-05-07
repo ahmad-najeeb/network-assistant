@@ -11,9 +11,6 @@ namespace NetworkAssistantNamespace
 {
     public class MainAppContext : ApplicationContext
     {
-        public static string ChangeIDBeingProcessed = NullChangeID;
-        public static MainAppContext AppInstance = null;
-
         static readonly NLog.Logger Logger = NLog.LogManager.GetCurrentClassLogger();
         static readonly object changeHandlerLock = new object();
         
@@ -27,11 +24,11 @@ namespace NetworkAssistantNamespace
         MenuItem currentConnectionMenuItem;
         MenuItem settingsMenuItem;
         MenuItem exitMenuItem;
-        Settings settings = null;
+        //Settings settings = null;
         
         public MainAppContext()
         {
-            AppInstance = this;
+            Global.Controller = this;
             Init();
         }
 
@@ -40,6 +37,7 @@ namespace NetworkAssistantNamespace
             Logger.Info("Initialization started");
 
             bool needToExitImmediately = false;
+            Global.ChangeIDBeingProcessed = NullChangeID;
 
             Thread.Sleep(500);
 
@@ -50,7 +48,7 @@ namespace NetworkAssistantNamespace
                 RefreshSystemTrayMenu();
                 trayIcon.Visible = true;
 
-                if (settings.NetworkInterfaceSwitchingEnabled == true)
+                if (Global.AppSettings.NetworkInterfaceSwitchingEnabled == true)
                 {
                     TriggerManualChangeDetection();
                     RefreshSystemTrayMenu();
@@ -73,15 +71,15 @@ namespace NetworkAssistantNamespace
 
         public void RefreshSystemTrayMenu()
         {
-            Logger.Trace("{changeID} :: Refreshing system tray menu ...", ChangeIDBeingProcessed);
+            Logger.Trace("{changeID} :: Refreshing system tray menu ...", Global.ChangeIDBeingProcessed);
 
-            enabledMenuItem.Checked = settings.NetworkInterfaceSwitchingEnabled.Value;
+            enabledMenuItem.Checked = Global.AppSettings.NetworkInterfaceSwitchingEnabled.Value;
 
             if (enabledMenuItem.Checked)
             {
                 currentConnectionMenuItem.Visible = true;
                 var status = GetRefreshedConnectivityState().ToString();
-                Logger.Trace("{changeID} :: Setting status text to: {statusText}", ChangeIDBeingProcessed, status);
+                Logger.Trace("{changeID} :: Setting status text to: {statusText}", Global.ChangeIDBeingProcessed, status);
                 currentConnectionMenuItem.Text = "      Current: " + status;
             } else
                 currentConnectionMenuItem.Visible = false;
@@ -111,10 +109,10 @@ namespace NetworkAssistantNamespace
 
         void ToggleNetworkInterfaceSwitching(object sender, EventArgs e)
         {
-            settings.NetworkInterfaceSwitchingEnabled = !settings.NetworkInterfaceSwitchingEnabled;
-            Logger.Info("Network switching has been" + (settings.NetworkInterfaceSwitchingEnabled == true ? "ENABLED" : "DISABLED"));
+            Global.AppSettings.NetworkInterfaceSwitchingEnabled = !Global.AppSettings.NetworkInterfaceSwitchingEnabled;
+            Logger.Info("Network switching has been" + (Global.AppSettings.NetworkInterfaceSwitchingEnabled == true ? "ENABLED" : "DISABLED"));
 
-            if (settings.NetworkInterfaceSwitchingEnabled.Value == true)
+            if (Global.AppSettings.NetworkInterfaceSwitchingEnabled.Value == true)
             {
                 TriggerManualChangeDetection();
                 if (currentlyListeningForChanges == false)
@@ -129,9 +127,9 @@ namespace NetworkAssistantNamespace
         void DisplaySettingsWindow(object sender, EventArgs e)
         {
             Logger.Info("Displaying Settings menu ...");
-            bool changesDone = settings.ShowSettingsForm(false);
+            bool changesDone = Global.AppSettings.ShowSettingsForm(false);
 
-            if (changesDone && settings.NetworkInterfaceSwitchingEnabled.Value == true)
+            if (changesDone && Global.AppSettings.NetworkInterfaceSwitchingEnabled.Value == true)
             {
                 RefreshSystemTrayMenu();
             }
@@ -141,12 +139,12 @@ namespace NetworkAssistantNamespace
         CurrentEnabledInterface GetRefreshedConnectivityState()
         {
             Logger.Info("Calculating current connectivity state ...");
-            settings.EthernetInterface.RefreshCurrentStatus();
-            settings.WifiInterface.RefreshCurrentStatus();
+            Global.AppSettings.EthernetInterface.RefreshCurrentStatus();
+            Global.AppSettings.WifiInterface.RefreshCurrentStatus();
 
-            if (settings.EthernetInterface.CurrentState > InterfaceState.EnabledButNoNetworkConnectivity
-                || settings.WifiInterface.CurrentState >= InterfaceState.EnabledButNoNetworkConnectivity)
-                if (settings.EthernetInterface.CurrentState > InterfaceState.EnabledButNoNetworkConnectivity)
+            if (Global.AppSettings.EthernetInterface.CurrentState > InterfaceState.EnabledButNoNetworkConnectivity
+                || Global.AppSettings.WifiInterface.CurrentState >= InterfaceState.EnabledButNoNetworkConnectivity)
+                if (Global.AppSettings.EthernetInterface.CurrentState > InterfaceState.EnabledButNoNetworkConnectivity)
                     return CurrentEnabledInterface.Ethernet;
                 else
                     return CurrentEnabledInterface.WiFi;
@@ -157,10 +155,10 @@ namespace NetworkAssistantNamespace
         void LoadSettings()
         {
             Logger.Info("Loading settings ...");
-            if (settings == null)
-                settings = Settings.GetSettingsInstance();
+            if (Global.AppSettings == null)
+                Settings.SetSettingsInstance();
 
-            settings.LoadSettings();
+            Global.AppSettings.LoadSettings();
 
             Logger.Info("Settings loaded");
         }
@@ -198,18 +196,18 @@ namespace NetworkAssistantNamespace
                 {
                     currentlyProcessingAChangeEvent = true;
                     Logger.Trace("{localChangeID} :: Got lock access", $"{localChangeID}L");
-                    MainAppContext.ChangeIDBeingProcessed = localChangeID;
+                    Global.ChangeIDBeingProcessed = localChangeID;
                     Logger.Trace("{localChangeID} :: Global Change ID set", $"{localChangeID}L");
                     Logger.Trace("{localChangeID} :: Starting change handling ...", $"{localChangeID}L");
                     CheckForChangeAndPerformUpdatesIfNeeded();
                     Logger.Trace("{localChangeID} :: Change handling ended. Releasing lock ...", $"{localChangeID}L");
-                    MainAppContext.ChangeIDBeingProcessed = NullChangeID;
+                    Global.ChangeIDBeingProcessed = NullChangeID;
                     currentlyProcessingAChangeEvent = false;
                 }
             }
             else
             {
-                Logger.Warn("{localChangeID} :: Locked out: Another change being serviced: {changeID}", $"{localChangeID}L", MainAppContext.ChangeIDBeingProcessed);
+                Logger.Warn("{localChangeID} :: Locked out: Another change being serviced: {changeID}", $"{localChangeID}L", Global.ChangeIDBeingProcessed);
             }
         }
 
@@ -223,30 +221,30 @@ namespace NetworkAssistantNamespace
 
         void CheckForChangeAndPerformUpdatesIfNeeded()
         {
-            Logger.Trace("{changeID} :: (Re)loading Network Interfaces ...", ChangeIDBeingProcessed);
-            NetworkInterfaceDevice.LoadAllNetworkInterfaces(settings);
+            Logger.Trace("{changeID} :: (Re)loading Network Interfaces ...", Global.ChangeIDBeingProcessed);
+            NetworkInterfaceDevice.LoadAllNetworkInterfaces();
 
-            Logger.Trace("{changeID} :: (Re)loading Network Interfaces done", ChangeIDBeingProcessed);
-            Logger.Trace("{changeID} :: Looking for changes ...", ChangeIDBeingProcessed);
+            Logger.Trace("{changeID} :: (Re)loading Network Interfaces done", Global.ChangeIDBeingProcessed);
+            Logger.Trace("{changeID} :: Looking for changes ...", Global.ChangeIDBeingProcessed);
 
-            if (settings.EthernetInterface.CurrentState == InterfaceState.Disabled)
+            if (Global.AppSettings.EthernetInterface.CurrentState == InterfaceState.Disabled)
             {
-                Logger.Trace("{changeID} :: Ethernet is disabled so enabing it ...", ChangeIDBeingProcessed);
-                settings.EthernetInterface.ChangeStateIfNeeded(InterfaceChangeNeeded.Enable);
+                Logger.Trace("{changeID} :: Ethernet is disabled so enabing it ...", Global.ChangeIDBeingProcessed);
+                Global.AppSettings.EthernetInterface.ChangeStateIfNeeded(InterfaceChangeNeeded.Enable);
             }
 
-            if (settings.EthernetInterface.CurrentState >= InterfaceState.HasNetworkConnectivity)
+            if (Global.AppSettings.EthernetInterface.CurrentState >= InterfaceState.HasNetworkConnectivity)
             {
-                Logger.Trace("{changeID} :: Ethernet has connectivity so disabling Wi-Fi (if it's not already) ...", ChangeIDBeingProcessed);
-                settings.WifiInterface.ChangeStateIfNeeded(InterfaceChangeNeeded.Disable);
+                Logger.Trace("{changeID} :: Ethernet has connectivity so disabling Wi-Fi (if it's not already) ...", Global.ChangeIDBeingProcessed);
+                Global.AppSettings.WifiInterface.ChangeStateIfNeeded(InterfaceChangeNeeded.Disable);
             }
             else
             {
-                Logger.Trace("{changeID} :: Ethernet has no connectivity so enabling Wi-Fi (if it's not already) ...", ChangeIDBeingProcessed);
-                settings.WifiInterface.ChangeStateIfNeeded(InterfaceChangeNeeded.Enable);
+                Logger.Trace("{changeID} :: Ethernet has no connectivity so enabling Wi-Fi (if it's not already) ...", Global.ChangeIDBeingProcessed);
+                Global.AppSettings.WifiInterface.ChangeStateIfNeeded(InterfaceChangeNeeded.Enable);
             }
 
-            MainAppContext.AppInstance.RefreshSystemTrayMenu(); //Do this in all cases to prevent latest Wifi data from not populating
+            RefreshSystemTrayMenu(); //Do this in all cases to prevent latest Wifi data from not populating
         }
 
         public static bool RunningAsAdministrator()
