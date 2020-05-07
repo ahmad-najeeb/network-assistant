@@ -18,13 +18,12 @@ namespace NetworkAssistantNamespace
         const string NullChangeID = "--------";
 
         bool currentlyListeningForChanges = false;
-        bool currentlyProcessingAChangeEvent = false;
+        
         NotifyIcon trayIcon;
         MenuItem enabledMenuItem;
         MenuItem currentConnectionMenuItem;
         MenuItem settingsMenuItem;
         MenuItem exitMenuItem;
-        //Settings settings = null;
         
         public MainAppContext()
         {
@@ -75,21 +74,21 @@ namespace NetworkAssistantNamespace
 
             enabledMenuItem.Checked = Global.AppSettings.NetworkInterfaceSwitchingEnabled.Value;
 
-            if (enabledMenuItem.Checked)
+            if (Global.AppSettings.NetworkInterfaceSwitchingEnabled.Value)
             {
                 currentConnectionMenuItem.Visible = true;
                 var status = GetRefreshedConnectivityState().ToString();
                 Logger.Trace("{changeID} :: Setting status text to: {statusText}", Global.ChangeIDBeingProcessed, status);
                 currentConnectionMenuItem.Text = "      Current: " + status;
-                trayIcon.Text = $"Connected to {status}"; 
             } else
             {
                 currentConnectionMenuItem.Visible = false;
-                trayIcon.Text = "Network switching is disabled";
             }
 
-            AssignCorrectSystemTrayIcon();
+            UpdateSystemTrayIconAndTooltipOnly();
         }
+
+
 
         public void ExitImmediately()
         {
@@ -141,7 +140,7 @@ namespace NetworkAssistantNamespace
             }   
         }
 
-        CurrentEnabledInterface GetRefreshedConnectivityState()
+        CurrentConnectionType GetRefreshedConnectivityState()
         {
             Logger.Info("Calculating current connectivity state ...");
             Global.AppSettings.EthernetInterface.RefreshCurrentStatus();
@@ -150,11 +149,11 @@ namespace NetworkAssistantNamespace
             if (Global.AppSettings.EthernetInterface.CurrentState > InterfaceState.EnabledButNoNetworkConnectivity
                 || Global.AppSettings.WifiInterface.CurrentState >= InterfaceState.EnabledButNoNetworkConnectivity)
                 if (Global.AppSettings.EthernetInterface.CurrentState > InterfaceState.EnabledButNoNetworkConnectivity)
-                    return CurrentEnabledInterface.Ethernet;
+                    return CurrentConnectionType.Ethernet;
                 else
-                    return CurrentEnabledInterface.WiFi;
+                    return CurrentConnectionType.WiFi;
             else
-                return CurrentEnabledInterface.None;
+                return CurrentConnectionType.None;
         }
         
         void LoadSettings()
@@ -195,19 +194,21 @@ namespace NetworkAssistantNamespace
                 Logger.Trace("Event details: {eventDetails}", e != null ? e.GetType().ToString() : "null");
             }
 
-            if (!currentlyProcessingAChangeEvent)
+            if (!Global.CurrentlyProcessingAChangeRequest)
             {
                 lock (changeHandlerLock)
                 {
-                    currentlyProcessingAChangeEvent = true;
+                    Global.CurrentlyProcessingAChangeRequest = true;
                     Logger.Trace("{localChangeID} :: Got lock access", $"{localChangeID}L");
                     Global.ChangeIDBeingProcessed = localChangeID;
                     Logger.Trace("{localChangeID} :: Global Change ID set", $"{localChangeID}L");
+                    UpdateSystemTrayIconAndTooltipOnly();
                     Logger.Trace("{localChangeID} :: Starting change handling ...", $"{localChangeID}L");
                     CheckForChangeAndPerformUpdatesIfNeeded();
                     Logger.Trace("{localChangeID} :: Change handling ended. Releasing lock ...", $"{localChangeID}L");
                     Global.ChangeIDBeingProcessed = NullChangeID;
-                    currentlyProcessingAChangeEvent = false;
+                    Global.CurrentlyProcessingAChangeRequest = false;
+                    RefreshSystemTrayMenu();
                 }
             }
             else
@@ -248,8 +249,6 @@ namespace NetworkAssistantNamespace
                 Logger.Trace("{changeID} :: Ethernet has no connectivity so enabling Wi-Fi (if it's not already) ...", Global.ChangeIDBeingProcessed);
                 Global.AppSettings.WifiInterface.ChangeStateIfNeeded(InterfaceChangeNeeded.Enable);
             }
-
-            RefreshSystemTrayMenu(); //Do this in all cases to prevent latest Wifi data from not populating
         }
 
         public static bool RunningAsAdministrator()
@@ -288,19 +287,42 @@ namespace NetworkAssistantNamespace
                     });
         }
 
-        void AssignCorrectSystemTrayIcon()
+        void UpdateSystemTrayIconAndTooltipOnly()
         {
-            CurrentEnabledInterface currentState = GetRefreshedConnectivityState();
-            if (Global.AppSettings.NetworkInterfaceSwitchingEnabled.Value == true
-                && Global.AppSettings.ShowCurrentConnectionTypeInSystemTray.Value == true)
-                if (currentState == CurrentEnabledInterface.Ethernet)
-                    trayIcon.Icon = Resources.EthernetSystemTrayIcon;
-                else if (currentState == CurrentEnabledInterface.WiFi)
-                    trayIcon.Icon = Resources.WifiSystemTrayIcon;
+            CurrentConnectionType currentState = GetRefreshedConnectivityState();
+            
+            if (Global.AppSettings.NetworkInterfaceSwitchingEnabled.Value == true)
+                if (Global.CurrentlyProcessingAChangeRequest)
+                {   
+                    trayIcon.Text = "Currently processing a networking change ...";
+
+                    if (Global.AppSettings.ShowCurrentConnectionTypeInSystemTray.Value == true)
+                        trayIcon.Icon = Resources.ProcessingIcon;
+                    else
+                        trayIcon.Icon = Resources.GenericSystemTrayIcon;
+                }
                 else
-                    throw new Exception($"No system tray icon to assign due to invalid connection status: {currentState}!");
+                {
+                    trayIcon.Text = $"Currently connected to {currentState}";
+
+                    if (Global.AppSettings.ShowCurrentConnectionTypeInSystemTray.Value == true)
+                    {
+                        if (currentState == CurrentConnectionType.Ethernet)
+                            trayIcon.Icon = Resources.EthernetSystemTrayIcon;
+                        else if (currentState == CurrentConnectionType.WiFi)
+                            trayIcon.Icon = Resources.WifiSystemTrayIcon;
+                        else
+                            trayIcon.Icon = Resources.DisconnectedIcon;
+                    }
+                    else
+                        trayIcon.Icon = Resources.GenericSystemTrayIcon;
+                }
             else
+            {
+                trayIcon.Text = "Network switching is currently disabled";
+
                 trayIcon.Icon = Resources.GenericSystemTrayIcon;
+            }
         }
 
         public void StartNetworkChangeMonitoring()
@@ -333,7 +355,7 @@ namespace NetworkAssistantNamespace
         }
     }
 
-    enum CurrentEnabledInterface
+    enum CurrentConnectionType
     {
         None,
         Ethernet,

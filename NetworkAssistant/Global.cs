@@ -6,6 +6,7 @@
         public static Settings AppSettings = null;
 
         public static string ChangeIDBeingProcessed;
+        public static bool CurrentlyProcessingAChangeRequest = false;
 
     }
 }
