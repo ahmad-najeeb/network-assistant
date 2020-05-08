@@ -103,16 +103,6 @@ namespace NetworkAssistantNamespace.Properties {
         /// <summary>
         ///   Looks up a localized resource of type System.Drawing.Icon similar to (Icon).
         /// </summary>
-        internal static System.Drawing.Icon ProcessingIcon {
-            get {
-                object obj = ResourceManager.GetObject("ProcessingIcon", resourceCulture);
-                return ((System.Drawing.Icon)(obj));
-            }
-        }
-        
-        /// <summary>
-        ///   Looks up a localized resource of type System.Drawing.Icon similar to (Icon).
-        /// </summary>
         internal static System.Drawing.Icon WifiSystemTrayIcon {
             get {
                 object obj = ResourceManager.GetObject("WifiSystemTrayIcon", resourceCulture);

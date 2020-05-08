@@ -2,6 +2,7 @@
 using System;
 using System.Collections.Generic;
 using System.Drawing;
+using System.IO;
 using System.Linq;
 using System.Net.NetworkInformation;
 using System.Runtime.InteropServices;
@@ -25,6 +26,8 @@ namespace NetworkAssistantNamespace
 
         const int numberOfLoadingAnimationFramesNeeded = 20;
 
+        bool initDone = false;
+
         bool currentlyListeningForChanges = false;
         
         NotifyIcon trayIcon;
@@ -32,10 +35,11 @@ namespace NetworkAssistantNamespace
         MenuItem currentConnectionMenuItem;
         MenuItem settingsMenuItem;
         MenuItem exitMenuItem;
+        ContextMenu contextMenu;
 
         Icon[] loadingIcons;
         int currentDisplayedLoadingIconIndex = -1;
-
+        
         System.Timers.Timer loadingIconAnimationTimer;
         
         public MainAppContext()
@@ -48,13 +52,22 @@ namespace NetworkAssistantNamespace
         {
             Logger.Info("Initialization started");
 
-            bool needToExitImmediately = false;
-
             Thread.Sleep(500);
 
             if (RunningAsAdministrator())
             {
                 Global.ChangeIDBeingProcessed = NullChangeID;
+
+                try
+                {
+                    //Create app data directory if it does not exist
+                    Directory.CreateDirectory(Global.AppDataDirectory);
+                }
+                catch (Exception e)
+                {
+                    MessageBox.Show($"Fatal error: Unable to create AppData directory: {Global.AppDataDirectory}. Exiting.\n\nException details:\n\n{e.Message}", "Fatal error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                    ExitImmediately();
+                }
 
                 //TODO: Measure time taken for icon generation
                 //TODO: Write icons to bin output if not present
@@ -62,13 +75,15 @@ namespace NetworkAssistantNamespace
 
                 LoadSettings();
                 InitializeSystemTrayMenu();
-                RefreshSystemTrayMenu();
+                //RefreshSystemTrayMenu();
                 trayIcon.Visible = true;
+                UpdateSystemTrayIconAndTooltipOnly();
 
                 if (Global.AppSettings.NetworkInterfaceSwitchingEnabled == true)
                 {
                     TriggerManualChangeDetection();
-                    RefreshSystemTrayMenu();
+                    //RefreshSystemTrayMenu();
+                    //UpdateSystemTrayIconAndTooltipOnly();
 
                     if (currentlyListeningForChanges == false)
                         StartNetworkChangeMonitoring();
@@ -77,11 +92,13 @@ namespace NetworkAssistantNamespace
             else
             {
                 MessageBox.Show("Please run Network Assistant with administrative privileges. Exiting.", "Error", MessageBoxButtons.OK, MessageBoxIcon.Exclamation);
-                needToExitImmediately = true;
-            }
-
-            if (needToExitImmediately)
                 ExitImmediately();
+            }   
+
+            initDone = true;
+
+            RefreshSystemTrayMenu();
+            trayIcon.ContextMenu = contextMenu;
 
             Logger.Info("Initialization done");
         }
@@ -187,14 +204,34 @@ namespace NetworkAssistantNamespace
             else
                 return CurrentConnectionType.None;
         }
+
+        void ValidateNetworkDeviceChoicesAndSettings(bool doingInitialSettingsLoad = false)
+        {
+            NetworkInterfaceDevice.LoadAllNetworkInterfaces();
+
+            if (doingInitialSettingsLoad
+                && (NetworkInterfaceDevice.AllEthernetNetworkInterfaces.Count == 0
+                || NetworkInterfaceDevice.AllWifiNetworkInterfaces.Count == 0))
+            {
+                MessageBox.Show("Your system doesn't have Wifi and/or Ethernet adapters. Please connect them before launching this app. Exiting.", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                ExitImmediately();
+            }
+
+            if (!Global.AppSettings.AreAllSettingsValidAndPresent())
+            {
+                if (doingInitialSettingsLoad == false)
+                    MessageBox.Show("You need to re-choose one or both network interfaces");
+                Global.AppSettings.ShowSettingsForm(true);
+            }
+        }
         
         void LoadSettings()
         {
             Logger.Info("Loading settings ...");
-            if (Global.AppSettings == null)
-                Settings.SetSettingsInstance();
 
-            Global.AppSettings.LoadSettings();
+            Settings.LoadSettingsFromFile();
+
+            ValidateNetworkDeviceChoicesAndSettings(true);
 
             Logger.Info("Settings loaded");
         }
@@ -260,7 +297,7 @@ namespace NetworkAssistantNamespace
         void CheckForChangeAndPerformUpdatesIfNeeded()
         {
             Logger.Trace("{changeID} :: (Re)loading Network Interfaces ...", Global.ChangeIDBeingProcessed);
-            NetworkInterfaceDevice.LoadAllNetworkInterfaces();
+            ValidateNetworkDeviceChoicesAndSettings();
 
             Logger.Trace("{changeID} :: (Re)loading Network Interfaces done", Global.ChangeIDBeingProcessed);
             Logger.Trace("{changeID} :: Looking for changes ...", Global.ChangeIDBeingProcessed);
@@ -311,7 +348,7 @@ namespace NetworkAssistantNamespace
             if (exitMenuItem == null)
                 exitMenuItem = new MenuItem("Exit", Exit);
 
-            trayIcon.ContextMenu = new ContextMenu(new MenuItem[] {
+            contextMenu = new ContextMenu(new MenuItem[] {
                     enabledMenuItem,
                     currentConnectionMenuItem,
                     settingsMenuItem,
@@ -335,7 +372,8 @@ namespace NetworkAssistantNamespace
                 }
                 else
                 {
-                    StopLoadingIconAnimation();
+                    if (initDone && loadingIconAnimationTimer.Enabled)
+                        StopLoadingIconAnimation();
 
                     trayIcon.Text = $"Currently connected to {currentState}";
 
@@ -386,6 +424,13 @@ namespace NetworkAssistantNamespace
             string chars = "abcdefghijklmnopqrstuvwxyz0123456789";
             return new string(Enumerable.Repeat(chars, ChangeIDLength)
               .Select(s => s[random.Next(s.Length)]).ToArray());
+        }
+
+        static Icon[] GetLoadingIcons()
+        {
+
+
+            return null;
         }
 
         static Icon[] GenerateLoadingIcons(Bitmap templateLoadingImage, int numberOfNeededFrames)

@@ -2,16 +2,15 @@
 using System;
 using System.IO;
 using System.Runtime.Serialization;
-using System.Windows.Forms;
 
 namespace NetworkAssistantNamespace
 {
     [DataContract]
     public class Settings
     {
-        static readonly string configFilePath = AppDomain.CurrentDomain.BaseDirectory + configFileName;
+        static readonly string configFilePath = Global.AppDataDirectory + "\\" + Global.ConfigFilename;
 
-        const string configFileName = "config.json";
+        
 
         public bool? NetworkInterfaceSwitchingEnabled { get; set; } = null;
 
@@ -34,29 +33,17 @@ namespace NetworkAssistantNamespace
         {   
         }
 
-        public void LoadSettings()
+        public static void LoadSettingsFromFile()
         {
-            if (File.Exists(configFilePath))
-            {
-                string configFileString = File.ReadAllText(configFilePath);
-                JsonConvert.PopulateObject(configFileString, this);
-                NetworkInterfaceSwitchingEnabled = AutoEnableSwitcherOnStartup;
-            }
+            string configFilePath = Global.AppDataDirectory + "\\" + Global.ConfigFilename;
+            Global.AppSettings = new Settings();
 
-            NetworkInterfaceDevice.LoadAllNetworkInterfaces();
-
-            if (NetworkInterfaceDevice.AllEthernetNetworkInterfaces.Count == 0
-                || NetworkInterfaceDevice.AllWifiNetworkInterfaces.Count == 0)
-            {
-                MessageBox.Show("Your system doesn't have Wifi and/or Ethernet adapters. Exiting.", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
-                Global.Controller.ExitImmediately();
-            }
-
-            if (!AllSettingsValidAndPresent())
-                ShowSettingsForm(true);
+            string configFileString = File.ReadAllText(configFilePath);
+            JsonConvert.PopulateObject(configFileString, Global.AppSettings);
+            Global.AppSettings.NetworkInterfaceSwitchingEnabled = Global.AppSettings.AutoEnableSwitcherOnStartup;
         }
 
-        bool AllSettingsValidAndPresent()
+        public bool AreAllSettingsValidAndPresent()
         {
             if (AutoEnableSwitcherOnStartup == null)
                 return false;
@@ -87,12 +74,14 @@ namespace NetworkAssistantNamespace
                 return changesDone;
             }
         }
+        /*
 
         public static void SetSettingsInstance()
         {
             if (Global.AppSettings == null)
                 Global.AppSettings = new Settings();
         }
+        */
 
         void WriteSettings()
         {
