@@ -1,21 +1,29 @@
 ﻿using NetworkAssistantNamespace.Properties;
 using System;
 using System.Collections.Generic;
+using System.Drawing;
 using System.Linq;
 using System.Net.NetworkInformation;
+using System.Runtime.InteropServices;
 using System.Security.Principal;
 using System.Threading;
+using System.Timers;
 using System.Windows.Forms;
 
 namespace NetworkAssistantNamespace
 {
     public class MainAppContext : ApplicationContext
     {
+        [DllImport("user32.dll", CharSet = CharSet.Auto)]
+        extern static bool DestroyIcon(IntPtr handle);
+
         static readonly NLog.Logger Logger = NLog.LogManager.GetCurrentClassLogger();
         static readonly object changeHandlerLock = new object();
         
         const int ChangeIDLength = 8;
         const string NullChangeID = "--------";
+
+        const int numberOfLoadingAnimationFramesNeeded = 20;
 
         bool currentlyListeningForChanges = false;
         
@@ -24,6 +32,11 @@ namespace NetworkAssistantNamespace
         MenuItem currentConnectionMenuItem;
         MenuItem settingsMenuItem;
         MenuItem exitMenuItem;
+
+        Icon[] loadingIcons;
+        int currentDisplayedLoadingIconIndex = -1;
+
+        System.Timers.Timer loadingIconAnimationTimer;
         
         public MainAppContext()
         {
@@ -36,12 +49,17 @@ namespace NetworkAssistantNamespace
             Logger.Info("Initialization started");
 
             bool needToExitImmediately = false;
-            Global.ChangeIDBeingProcessed = NullChangeID;
 
             Thread.Sleep(500);
 
             if (RunningAsAdministrator())
             {
+                Global.ChangeIDBeingProcessed = NullChangeID;
+
+                //TODO: Measure time taken for icon generation
+                //TODO: Write icons to bin output if not present
+                loadingIcons = GenerateLoadingIcons(Resources.LoadingIconTemplate, numberOfLoadingAnimationFramesNeeded);
+
                 LoadSettings();
                 InitializeSystemTrayMenu();
                 RefreshSystemTrayMenu();
@@ -88,28 +106,39 @@ namespace NetworkAssistantNamespace
             UpdateSystemTrayIconAndTooltipOnly();
         }
 
-
-
-        public void ExitImmediately()
+        void DoExitRoutine(bool doImmediateExit)
         {
-            Logger.Info("Shutting down immediately ...");
+            if (doImmediateExit)
+                Logger.Info("Shutting down immediately ...");
+            else
+                Logger.Info("Shutting down ...");
+
+            if (loadingIcons != null)
+                foreach (Icon loadingIcon in loadingIcons)
+                    DestroyIcon(loadingIcon.Handle);
+
             NLog.LogManager.Shutdown();
             if (trayIcon != null)
             {
                 trayIcon.Visible = false;
             }
-            Environment.Exit(0); //TODO: See if this can be avoided
+
+            Logger.Info("Bye bye :) ...");
+
+            if (doImmediateExit)
+                Environment.Exit(0); //TODO: See if this can be avoided
+            else
+                Application.Exit();
+        }
+
+        public void ExitImmediately()
+        {   
+            DoExitRoutine(true);
         }
 
         void Exit(object sender, EventArgs e)
-        {
-            Logger.Info("Shutting down ...");
-            NLog.LogManager.Shutdown();
-            if (trayIcon != null)
-            {
-                trayIcon.Visible = false;
-            }
-            Application.Exit();
+        {   
+            DoExitRoutine(false);
         }
 
         void ToggleNetworkInterfaceSwitching(object sender, EventArgs e)
@@ -124,9 +153,12 @@ namespace NetworkAssistantNamespace
                     StartNetworkChangeMonitoring();
             }
             else
+            {
                 StopNetworkChangeMonitoring();
+                RefreshSystemTrayMenu();
+            }
 
-            RefreshSystemTrayMenu();
+            //RefreshSystemTrayMenu(); //This is not needed because TriggerManualChangeDetection() already executes it at the end
         }
 
         void DisplaySettingsWindow(object sender, EventArgs e)
@@ -297,12 +329,14 @@ namespace NetworkAssistantNamespace
                     trayIcon.Text = "Currently processing a networking change ...";
 
                     if (Global.AppSettings.ShowCurrentConnectionTypeInSystemTray.Value == true)
-                        trayIcon.Icon = Resources.ProcessingIcon;
+                        StartLoadingIconAnimation();
                     else
                         trayIcon.Icon = Resources.GenericSystemTrayIcon;
                 }
                 else
                 {
+                    StopLoadingIconAnimation();
+
                     trayIcon.Text = $"Currently connected to {currentState}";
 
                     if (Global.AppSettings.ShowCurrentConnectionTypeInSystemTray.Value == true)
@@ -352,6 +386,91 @@ namespace NetworkAssistantNamespace
             string chars = "abcdefghijklmnopqrstuvwxyz0123456789";
             return new string(Enumerable.Repeat(chars, ChangeIDLength)
               .Select(s => s[random.Next(s.Length)]).ToArray());
+        }
+
+        static Icon[] GenerateLoadingIcons(Bitmap templateLoadingImage, int numberOfNeededFrames)
+        {
+            if (numberOfNeededFrames < 2)
+                throw new Exception("Invalid number of needed frames provided for loading icons generation: " + numberOfNeededFrames);
+
+            Icon[] icons = new Icon[numberOfNeededFrames];
+
+            float angleInterval = (360f / numberOfNeededFrames);
+
+            Bitmap tmpBitmap;
+            float currentAngle = 0f;
+            for (int i = 0; i < numberOfNeededFrames; i++)
+            {
+                if (i == 0)
+                    tmpBitmap = templateLoadingImage;
+                else
+                {
+                    currentAngle += angleInterval;
+                    tmpBitmap = RotateImage(templateLoadingImage, currentAngle);
+                }
+                icons[i] = Icon.FromHandle(tmpBitmap.GetHicon());
+            }
+
+            return icons;
+        }
+
+        static Bitmap RotateImage(Bitmap bmp, float angle)
+        {
+            Bitmap rotatedImage = new Bitmap(bmp.Width, bmp.Height);
+            rotatedImage.SetResolution(bmp.HorizontalResolution, bmp.VerticalResolution);
+
+            using (Graphics g = Graphics.FromImage(rotatedImage))
+            {
+                // Set the rotation point to the center in the matrix
+                g.TranslateTransform(bmp.Width / 2, bmp.Height / 2);
+                // Rotate
+                g.RotateTransform(angle);
+                // Restore rotation point in the matrix
+                g.TranslateTransform(-bmp.Width / 2, -bmp.Height / 2);
+                // Draw the image on the bitmap
+                g.DrawImage(bmp, new Point(0, 0));
+            }
+            return rotatedImage;
+        }
+
+        void StartLoadingIconAnimation()
+        {
+            if (loadingIconAnimationTimer == null)
+            {
+                loadingIconAnimationTimer = new System.Timers.Timer(1000 / loadingIcons.Length);
+                loadingIconAnimationTimer.Elapsed += LoadingIconRotationEvent;
+                loadingIconAnimationTimer.AutoReset = true;
+            }
+
+            if (loadingIconAnimationTimer.Enabled == false)
+            {
+                loadingIconAnimationTimer.Enabled = true;
+                Logger.Trace("{changeID} :: Started ANIMATION", Global.ChangeIDBeingProcessed);
+            }
+            else
+                throw new Exception("loadingIconAnimationTimer is already enabled to why the request to enable again ?");
+            
+        }
+
+        void StopLoadingIconAnimation()
+        {
+            if (loadingIconAnimationTimer.Enabled == true)
+            {
+                loadingIconAnimationTimer.Enabled = false;
+                Logger.Trace("{changeID} :: Stopped ANIMATION", Global.ChangeIDBeingProcessed);
+            }
+            else
+                throw new Exception("loadingIconAnimationTimer is already disabled to why the request to disable again ?");
+        }
+
+        void LoadingIconRotationEvent(Object source, ElapsedEventArgs e)
+        {
+            if (currentDisplayedLoadingIconIndex == -1)
+                currentDisplayedLoadingIconIndex = 0;
+            else
+                currentDisplayedLoadingIconIndex = (currentDisplayedLoadingIconIndex + 1) % loadingIcons.Length;
+
+            trayIcon.Icon = loadingIcons[currentDisplayedLoadingIconIndex];
         }
     }
 
