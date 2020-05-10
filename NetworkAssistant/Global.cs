@@ -47,15 +47,17 @@ namespace NetworkAssistantNamespace
         }
 
         public static void Log(Logger logger, LogLevel level, string message, int callDepth,
-            KeyValuePair<string, string>[] originalProperties, params KeyValuePair<string, string>[] additionalProperties)
+            KeyValuePair<string, string>[] originalProperties, KeyValuePair<string, string>[] additionalProperties)
         {
             LogEventInfo eventInfo = new LogEventInfo(level, logger.Name, message);
 
-            foreach (KeyValuePair<string, string> pair in originalProperties)
-                eventInfo.Properties[pair.Key] = pair.Value;
+            if (originalProperties != null)
+                foreach (KeyValuePair<string, string> pair in originalProperties)
+                    eventInfo.Properties[pair.Key] = pair.Value;
 
-            foreach (KeyValuePair<string, string> pair in additionalProperties)
-                eventInfo.Properties[pair.Key] = pair.Value;
+            if (additionalProperties != null)
+                foreach (KeyValuePair<string, string> pair in additionalProperties)
+                    eventInfo.Properties[pair.Key] = pair.Value;
 
             eventInfo.Properties[LoggingVarNames.SpaceName] = GetSpace(callDepth);
 

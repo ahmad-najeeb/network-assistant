@@ -377,16 +377,18 @@ namespace NetworkAssistantNamespace
         private static void LogThisStatic(LogLevel level, string message, string callerMethodName = null, int? callDepth = null, NetworkInterfaceDevice device = null, params KeyValuePair<string, string>[] properties)
         {
             int callDepthToUse = callDepth.HasValue ? callDepth.Value : (new StackTrace()).FrameCount;
+
+            int additionalPropertiesSize = 1;
             if (device != null)
-            {
-                Global.Log(Logger, level, message, callDepthToUse, properties,
-                Global.Pair(Global.LoggingVarNames.InterfaceType, device.interfaceType.GetDescriptionString()),
-                Global.Pair(Global.LoggingVarNames.CallerMethodName, callerMethodName ?? new StackFrame(1).GetMethod().Name));
-            }
-            else
-            {
-                Global.Log(Logger, level, message, callDepthToUse, properties);
-            }
+                additionalPropertiesSize += 1;
+
+            KeyValuePair<string, string>[] additionalProperties = new KeyValuePair<string, string>[additionalPropertiesSize];
+
+            additionalProperties[0] = new KeyValuePair<string, string>(Global.LoggingVarNames.CallerMethodName, callerMethodName ?? new StackFrame(1).GetMethod().Name);
+            if (device != null)
+                additionalProperties[1] = new KeyValuePair<string, string>(Global.LoggingVarNames.InterfaceType, device.interfaceType.GetDescriptionString());
+
+            Global.Log(Logger, level, message, callDepthToUse, properties, additionalProperties);
         }
     }
 

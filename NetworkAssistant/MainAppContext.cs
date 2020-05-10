@@ -2,6 +2,7 @@
 using NLog;
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Drawing;
 using System.IO;
 using System.Linq;
@@ -50,7 +51,8 @@ namespace NetworkAssistantNamespace
 
         void Init()
         {
-            Logger.Info("Initialization started");
+            LogThis(LogLevel.Info, "Initialization started");
+            LogThis(LogLevel.Info, "Initialization started");
 
             Thread.Sleep(500);
 
@@ -98,12 +100,12 @@ namespace NetworkAssistantNamespace
             //RefreshSystemTrayMenu();
             trayIcon.ContextMenu = contextMenu;
 
-            Logger.Info("Initialization done");
+            LogThis(LogLevel.Info, "Initialization done");
         }
 
         public void RefreshSystemTrayMenu()
         {
-            Logger.Trace("Refreshing system tray menu ...");
+            LogThis(LogLevel.Trace, "Refreshing system tray menu ...");
 
             enabledMenuItem.Checked = Global.AppSettings.NetworkInterfaceSwitchingEnabled.Value;
 
@@ -111,7 +113,7 @@ namespace NetworkAssistantNamespace
             {
                 currentConnectionMenuItem.Visible = true;
                 var status = GetRefreshedConnectivityState().ToString();
-                Logger.Trace("Setting status text to: {statusText}", Global.ChangeIDBeingProcessed, status);
+                LogThis(LogLevel.Trace, $"Setting status text to: {status}");
                 currentConnectionMenuItem.Text = "      Current: " + status;
             } else
             {
@@ -124,9 +126,9 @@ namespace NetworkAssistantNamespace
         void DoExitRoutine(bool doImmediateExit)
         {
             if (doImmediateExit)
-                Logger.Info("Shutting down immediately ...");
+                LogThis(LogLevel.Info, "Shutting down immediately ...");
             else
-                Logger.Info("Shutting down ...");
+                LogThis(LogLevel.Info, "Shutting down ...");
 
             if (loadingIcons != null)
                 foreach (Icon loadingIcon in loadingIcons)
@@ -138,7 +140,7 @@ namespace NetworkAssistantNamespace
                 trayIcon.Visible = false;
             }
 
-            Logger.Info("Bye bye :) ...");
+            LogThis(LogLevel.Info, "Bye bye :) ...");
 
             if (doImmediateExit)
                 Environment.Exit(0); //TODO: See if this can be avoided
@@ -159,7 +161,7 @@ namespace NetworkAssistantNamespace
         void ToggleNetworkInterfaceSwitching(object sender, EventArgs e)
         {
             Global.AppSettings.NetworkInterfaceSwitchingEnabled = !Global.AppSettings.NetworkInterfaceSwitchingEnabled;
-            Logger.Info("Network switching has been" + (Global.AppSettings.NetworkInterfaceSwitchingEnabled == true ? "ENABLED" : "DISABLED"));
+            LogThis(LogLevel.Info, "Network switching has been" + (Global.AppSettings.NetworkInterfaceSwitchingEnabled == true ? "ENABLED" : "DISABLED"));
 
             if (Global.AppSettings.NetworkInterfaceSwitchingEnabled.Value == true)
             {
@@ -178,7 +180,7 @@ namespace NetworkAssistantNamespace
 
         void DisplaySettingsWindow(object sender, EventArgs e)
         {
-            Logger.Info("Displaying Settings menu ...");
+            LogThis(LogLevel.Info, "Displaying Settings menu ...");
             bool changesDone = Global.AppSettings.ShowSettingsForm(false);
 
             if (changesDone)
@@ -189,7 +191,7 @@ namespace NetworkAssistantNamespace
 
         InterfaceType GetRefreshedConnectivityState()
         {
-            Logger.Info("Calculating current connectivity state ...");
+            LogThis(LogLevel.Info, "Calculating current connectivity state ...");
             Global.AppSettings.EthernetInterface.RefreshCurrentStatus();
             Global.AppSettings.WifiInterface.RefreshCurrentStatus();
 
@@ -225,7 +227,7 @@ namespace NetworkAssistantNamespace
         
         void LoadSettings()
         {
-            Logger.Info("Loading settings ...");
+            LogThis(LogLevel.Info, "Loading settings ...");
 
             bool anyPersistedConfigRepaired = false;
 
@@ -236,12 +238,12 @@ namespace NetworkAssistantNamespace
 
             ValidateNetworkDeviceChoicesAndSettings(true);
 
-            Logger.Info("Settings loaded");
+            LogThis(LogLevel.Info, "Settings loaded");
         }
 
         void ChangeEventHandler(object sender, EventArgs e)
         {
-            Logger.Trace("Received change event fire -- spawning thread");
+            LogThis(LogLevel.Trace, "Received change event fire -- spawning thread");
 
             Thread t = new Thread(new ParameterizedThreadStart(CreateChangeRequest_Common));
             t.Start(new List<object> { true, sender, e });
@@ -251,7 +253,7 @@ namespace NetworkAssistantNamespace
         {
             string localChangeID = GenerateChangeID();
             
-            Logger.Trace("Initiating COMMON change handling: {localChangeID}", $"{localChangeID}L");
+            LogThis(LogLevel.Trace, $"Initiating COMMON change handling: {localChangeID}L");
 
             List<object> changeDataList = (List<object>)changeData;
 
@@ -259,12 +261,12 @@ namespace NetworkAssistantNamespace
             object sender = changeDataList.Count >= 2 ? (changeDataList).ElementAt(1) : null;
             EventArgs e = changeDataList.Count >= 3 ? (EventArgs)(changeDataList).ElementAt(2) : null;
 
-            Logger.Trace("Event source type: {eventSourceType}", (isChangeEventFireHandling == true ? "Event Fire" : "Monitor Enable"));
+            LogThis(LogLevel.Trace, $"Event source type: {(isChangeEventFireHandling == true ? "Event Fire" : "Monitor Enable")}");
             
             if (isChangeEventFireHandling)
             {
-                Logger.Trace("Event sender: {eventSender}", sender != null ? sender.ToString() : "null");
-                Logger.Trace("Event details: {eventDetails}", e != null ? e.GetType().ToString() : "null");
+                LogThis(LogLevel.Trace, $"Event sender: {(sender != null ? sender.ToString() : "null")}");
+                LogThis(LogLevel.Trace, $"Event details: {(e != null ? e.GetType().ToString() : "null")}");
             }
 
             if (!Global.CurrentlyProcessingAChangeRequest)
@@ -274,14 +276,14 @@ namespace NetworkAssistantNamespace
 
                     
                     Global.CurrentlyProcessingAChangeRequest = true;
-                    Logger.Trace("Got lock access: {localChangeID}", $"{localChangeID}L");
+                    LogThis(LogLevel.Trace, $"Got lock access: {localChangeID}L");
                     Global.ChangeIDBeingProcessed = localChangeID;
                     GlobalDiagnosticsContext.Set(Global.LoggingVarNames.ChangeId, localChangeID);
-                    Logger.Trace("Global Change ID set");
+                    LogThis(LogLevel.Trace, "Global Change ID set");
                     UpdateSystemTrayIconAndTooltipOnly();
-                    Logger.Trace("Starting change handling ...");
+                    LogThis(LogLevel.Trace, "Starting change handling ...");
                     CheckForChangeAndPerformUpdatesIfNeeded();
-                    Logger.Trace("Change handling ended. Releasing lock ...");
+                    LogThis(LogLevel.Trace, "Change handling ended. Releasing lock ...");
                     Global.ChangeIDBeingProcessed = null;
 
                     GlobalDiagnosticsContext.Remove(Global.LoggingVarNames.ChangeId);
@@ -299,7 +301,7 @@ namespace NetworkAssistantNamespace
 
         void TriggerManualChangeDetection()
         {
-            Logger.Trace("Received manual change detection request -- spawning thread");
+            LogThis(LogLevel.Trace, "Received manual change detection request -- spawning thread");
 
             Thread t = new Thread(new ParameterizedThreadStart(CreateChangeRequest_Common));
             t.Start(new List<object> { false });
@@ -307,40 +309,40 @@ namespace NetworkAssistantNamespace
 
         void CheckForChangeAndPerformUpdatesIfNeeded()
         {
-            Logger.Trace("(Re)loading Network Interfaces ...");
+            LogThis(LogLevel.Trace, "(Re)loading Network Interfaces ...");
             ValidateNetworkDeviceChoicesAndSettings();
 
-            Logger.Trace("(Re)loading Network Interfaces done");
-            Logger.Trace("Looking for changes ...");
+            LogThis(LogLevel.Trace, "(Re)loading Network Interfaces done");
+            LogThis(LogLevel.Trace, "Looking for changes ...");
 
             if (Global.AppSettings.EthernetInterface.CurrentState == InterfaceState.Disabled)
             {
-                Logger.Trace("Ethernet is disabled so enabing it ...");
+                LogThis(LogLevel.Trace, "Ethernet is disabled so enabing it ...");
                 Global.AppSettings.EthernetInterface.ChangeStateIfNeeded(InterfaceChangeNeeded.Enable);
             }
 
             if (Global.AppSettings.EthernetInterface.CurrentState >= InterfaceState.HasNetworkConnectivity)
             {
-                Logger.Trace("Ethernet has connectivity so disabling Wi-Fi (if it's not already) ...");
+                LogThis(LogLevel.Trace, "Ethernet has connectivity so disabling Wi-Fi (if it's not already) ...");
                 Global.AppSettings.WifiInterface.ChangeStateIfNeeded(InterfaceChangeNeeded.Disable);
             }
             else
             {
-                Logger.Trace("Ethernet has no connectivity so enabling Wi-Fi (if it's not already) ...");
+                LogThis(LogLevel.Trace, "Ethernet has no connectivity so enabling Wi-Fi (if it's not already) ...");
                 Global.AppSettings.WifiInterface.ChangeStateIfNeeded(InterfaceChangeNeeded.Enable);
             }
         }
 
         public static bool RunningAsAdministrator()
         {
-            Logger.Trace("Checking if user running program has administrative privileges ...");
+            LogThisStatic(LogLevel.Trace, "Checking if user running program has administrative privileges ...");
             return (new WindowsPrincipal(WindowsIdentity.GetCurrent()))
                       .IsInRole(WindowsBuiltInRole.Administrator);
         }
 
         void InitializeSystemTrayMenu()
         {
-            Logger.Info("Initializing system tray menu ...");
+            LogThis(LogLevel.Info, "Initializing system tray menu ...");
 
             trayIcon = new NotifyIcon();
 
@@ -415,7 +417,7 @@ namespace NetworkAssistantNamespace
 
             currentlyListeningForChanges = true;
 
-            Logger.Info("*** STARTED listening for network changes ***");
+            LogThis(LogLevel.Info, "*** STARTED listening for network changes ***");
 
         }
 
@@ -426,7 +428,7 @@ namespace NetworkAssistantNamespace
 
             currentlyListeningForChanges = false;
 
-            Logger.Info("*** STOPPED listening for network changes ***");
+            LogThis(LogLevel.Info, "*** STOPPED listening for network changes ***");
         }
 
         string GenerateChangeID()
@@ -501,7 +503,7 @@ namespace NetworkAssistantNamespace
             if (loadingIconAnimationTimer.Enabled == false)
             {
                 loadingIconAnimationTimer.Enabled = true;
-                Logger.Trace("Started ANIMATION");
+                LogThis(LogLevel.Trace, "Started ANIMATION");
             }
             else
                 throw new Exception("loadingIconAnimationTimer is already enabled to why the request to enable again ?");
@@ -513,7 +515,7 @@ namespace NetworkAssistantNamespace
             if (loadingIconAnimationTimer.Enabled == true)
             {
                 loadingIconAnimationTimer.Enabled = false;
-                Logger.Trace("Stopped ANIMATION");
+                LogThis(LogLevel.Trace, "Stopped ANIMATION");
             }
             else
                 throw new Exception("loadingIconAnimationTimer is already disabled to why the request to disable again ?");
@@ -527,6 +529,24 @@ namespace NetworkAssistantNamespace
                 currentDisplayedLoadingIconIndex = (currentDisplayedLoadingIconIndex + 1) % loadingIcons.Length;
 
             trayIcon.Icon = loadingIcons[currentDisplayedLoadingIconIndex];
+        }
+
+        private void LogThis(LogLevel level, string message, params KeyValuePair<string, string>[] properties)
+        {
+            LogThisStatic(level: level, message: message, properties: properties, callerMethodName: new StackFrame(1).GetMethod().Name);
+        }
+
+        private static void LogThisStatic(LogLevel level, string message, string callerMethodName = null, int? callDepth = null, params KeyValuePair<string, string>[] properties)
+        {
+            int callDepthToUse = callDepth.HasValue ? callDepth.Value : (new StackTrace()).FrameCount;
+
+            int additionalPropertiesSize = 1;
+            
+            KeyValuePair<string, string>[] additionalProperties = new KeyValuePair<string, string>[additionalPropertiesSize];
+
+            additionalProperties[0] = new KeyValuePair<string, string>(Global.LoggingVarNames.CallerMethodName, callerMethodName ?? new StackFrame(1).GetMethod().Name);
+            
+            Global.Log(Logger, level, message, callDepthToUse, properties, additionalProperties);
         }
     }
 }
