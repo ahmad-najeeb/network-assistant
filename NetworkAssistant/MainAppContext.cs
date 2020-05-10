@@ -1,4 +1,5 @@
 ﻿using NetworkAssistantNamespace.Properties;
+using NLog;
 using System;
 using System.Collections.Generic;
 using System.Drawing;
@@ -22,7 +23,6 @@ namespace NetworkAssistantNamespace
         static readonly object changeHandlerLock = new object();
         
         const int ChangeIDLength = 8;
-        const string NullChangeID = "--------";
 
         const int numberOfLoadingAnimationFramesNeeded = 20;
 
@@ -52,12 +52,18 @@ namespace NetworkAssistantNamespace
         {
             Logger.Info("Initialization started");
 
+            MessageBox.Show(LogManager.Configuration.Variables["logLevelMaxLength"].ToString());
+
+            LogManager.Configuration.Variables["logLevelMaxLength"] = "10";
+
+            MessageBox.Show(LogManager.Configuration.Variables["logLevelMaxLength"].ToString());
+
+            LogManager.ReconfigExistingLoggers();
+
             Thread.Sleep(500);
 
             if (RunningAsAdministrator())
             {
-                Global.ChangeIDBeingProcessed = NullChangeID;
-
                 try
                 {
                     //Create app data directory if it does not exist
@@ -97,7 +103,7 @@ namespace NetworkAssistantNamespace
 
             initDone = true;
 
-            RefreshSystemTrayMenu();
+            //RefreshSystemTrayMenu();
             trayIcon.ContextMenu = contextMenu;
 
             Logger.Info("Initialization done");
@@ -105,7 +111,7 @@ namespace NetworkAssistantNamespace
 
         public void RefreshSystemTrayMenu()
         {
-            Logger.Trace("{changeID} :: Refreshing system tray menu ...", Global.ChangeIDBeingProcessed);
+            Logger.Trace("Refreshing system tray menu ...");
 
             enabledMenuItem.Checked = Global.AppSettings.NetworkInterfaceSwitchingEnabled.Value;
 
@@ -113,7 +119,7 @@ namespace NetworkAssistantNamespace
             {
                 currentConnectionMenuItem.Visible = true;
                 var status = GetRefreshedConnectivityState().ToString();
-                Logger.Trace("{changeID} :: Setting status text to: {statusText}", Global.ChangeIDBeingProcessed, status);
+                Logger.Trace("Setting status text to: {statusText}", Global.ChangeIDBeingProcessed, status);
                 currentConnectionMenuItem.Text = "      Current: " + status;
             } else
             {
@@ -189,7 +195,7 @@ namespace NetworkAssistantNamespace
             }   
         }
 
-        CurrentConnectionType GetRefreshedConnectivityState()
+        InterfaceType GetRefreshedConnectivityState()
         {
             Logger.Info("Calculating current connectivity state ...");
             Global.AppSettings.EthernetInterface.RefreshCurrentStatus();
@@ -198,11 +204,11 @@ namespace NetworkAssistantNamespace
             if (Global.AppSettings.EthernetInterface.CurrentState > InterfaceState.EnabledButNoNetworkConnectivity
                 || Global.AppSettings.WifiInterface.CurrentState >= InterfaceState.EnabledButNoNetworkConnectivity)
                 if (Global.AppSettings.EthernetInterface.CurrentState > InterfaceState.EnabledButNoNetworkConnectivity)
-                    return CurrentConnectionType.Ethernet;
+                    return InterfaceType.Ethernet;
                 else
-                    return CurrentConnectionType.WiFi;
+                    return InterfaceType.WiFi;
             else
-                return CurrentConnectionType.None;
+                return InterfaceType.None;
         }
 
         void ValidateNetworkDeviceChoicesAndSettings(bool doingInitialSettingsLoad = false)
@@ -229,7 +235,12 @@ namespace NetworkAssistantNamespace
         {
             Logger.Info("Loading settings ...");
 
-            Settings.LoadSettingsFromFile();
+            bool anyPersistedConfigRepaired = false;
+
+            Settings.LoadSettingsFromFile(ref anyPersistedConfigRepaired);
+
+            if (anyPersistedConfigRepaired)
+                Global.AppSettings.WriteSettings();
 
             ValidateNetworkDeviceChoicesAndSettings(true);
 
@@ -247,7 +258,8 @@ namespace NetworkAssistantNamespace
         void CreateChangeRequest_Common(object changeData)
         {
             string localChangeID = GenerateChangeID();
-            Logger.Trace("{localChangeID} :: Initiating COMMON change handling", $"{localChangeID}L");
+            
+            Logger.Trace("Initiating COMMON change handling: {localChangeID}", $"{localChangeID}L");
 
             List<object> changeDataList = (List<object>)changeData;
 
@@ -267,22 +279,29 @@ namespace NetworkAssistantNamespace
             {
                 lock (changeHandlerLock)
                 {
+
+                    
                     Global.CurrentlyProcessingAChangeRequest = true;
-                    Logger.Trace("{localChangeID} :: Got lock access", $"{localChangeID}L");
+                    Logger.Trace("Got lock access: {localChangeID}", $"{localChangeID}L");
                     Global.ChangeIDBeingProcessed = localChangeID;
-                    Logger.Trace("{localChangeID} :: Global Change ID set", $"{localChangeID}L");
+                    GlobalDiagnosticsContext.Set(Global.LoggingVarNames.ChangeId, localChangeID);
+                    Logger.Trace("Global Change ID set");
                     UpdateSystemTrayIconAndTooltipOnly();
-                    Logger.Trace("{localChangeID} :: Starting change handling ...", $"{localChangeID}L");
+                    Logger.Trace("Starting change handling ...");
                     CheckForChangeAndPerformUpdatesIfNeeded();
-                    Logger.Trace("{localChangeID} :: Change handling ended. Releasing lock ...", $"{localChangeID}L");
-                    Global.ChangeIDBeingProcessed = NullChangeID;
+                    Logger.Trace("Change handling ended. Releasing lock ...");
+                    Global.ChangeIDBeingProcessed = null;
+
+                    GlobalDiagnosticsContext.Remove(Global.LoggingVarNames.ChangeId);
+
                     Global.CurrentlyProcessingAChangeRequest = false;
+
                     RefreshSystemTrayMenu();
                 }
             }
             else
             {
-                Logger.Warn("{localChangeID} :: Locked out: Another change being serviced: {changeID}", $"{localChangeID}L", Global.ChangeIDBeingProcessed);
+                Logger.Warn("Locked out: Another change being serviced: {changeID}");
             }
         }
 
@@ -296,26 +315,26 @@ namespace NetworkAssistantNamespace
 
         void CheckForChangeAndPerformUpdatesIfNeeded()
         {
-            Logger.Trace("{changeID} :: (Re)loading Network Interfaces ...", Global.ChangeIDBeingProcessed);
+            Logger.Trace("(Re)loading Network Interfaces ...");
             ValidateNetworkDeviceChoicesAndSettings();
 
-            Logger.Trace("{changeID} :: (Re)loading Network Interfaces done", Global.ChangeIDBeingProcessed);
-            Logger.Trace("{changeID} :: Looking for changes ...", Global.ChangeIDBeingProcessed);
+            Logger.Trace("(Re)loading Network Interfaces done");
+            Logger.Trace("Looking for changes ...");
 
             if (Global.AppSettings.EthernetInterface.CurrentState == InterfaceState.Disabled)
             {
-                Logger.Trace("{changeID} :: Ethernet is disabled so enabing it ...", Global.ChangeIDBeingProcessed);
+                Logger.Trace("Ethernet is disabled so enabing it ...");
                 Global.AppSettings.EthernetInterface.ChangeStateIfNeeded(InterfaceChangeNeeded.Enable);
             }
 
             if (Global.AppSettings.EthernetInterface.CurrentState >= InterfaceState.HasNetworkConnectivity)
             {
-                Logger.Trace("{changeID} :: Ethernet has connectivity so disabling Wi-Fi (if it's not already) ...", Global.ChangeIDBeingProcessed);
+                Logger.Trace("Ethernet has connectivity so disabling Wi-Fi (if it's not already) ...");
                 Global.AppSettings.WifiInterface.ChangeStateIfNeeded(InterfaceChangeNeeded.Disable);
             }
             else
             {
-                Logger.Trace("{changeID} :: Ethernet has no connectivity so enabling Wi-Fi (if it's not already) ...", Global.ChangeIDBeingProcessed);
+                Logger.Trace("Ethernet has no connectivity so enabling Wi-Fi (if it's not already) ...");
                 Global.AppSettings.WifiInterface.ChangeStateIfNeeded(InterfaceChangeNeeded.Enable);
             }
         }
@@ -358,7 +377,7 @@ namespace NetworkAssistantNamespace
 
         void UpdateSystemTrayIconAndTooltipOnly()
         {
-            CurrentConnectionType currentState = GetRefreshedConnectivityState();
+            InterfaceType currentState = GetRefreshedConnectivityState();
             
             if (Global.AppSettings.NetworkInterfaceSwitchingEnabled.Value == true)
                 if (Global.CurrentlyProcessingAChangeRequest)
@@ -379,9 +398,9 @@ namespace NetworkAssistantNamespace
 
                     if (Global.AppSettings.ShowCurrentConnectionTypeInSystemTray.Value == true)
                     {
-                        if (currentState == CurrentConnectionType.Ethernet)
+                        if (currentState == InterfaceType.Ethernet)
                             trayIcon.Icon = Resources.EthernetSystemTrayIcon;
-                        else if (currentState == CurrentConnectionType.WiFi)
+                        else if (currentState == InterfaceType.WiFi)
                             trayIcon.Icon = Resources.WifiSystemTrayIcon;
                         else
                             trayIcon.Icon = Resources.DisconnectedIcon;
@@ -490,7 +509,7 @@ namespace NetworkAssistantNamespace
             if (loadingIconAnimationTimer.Enabled == false)
             {
                 loadingIconAnimationTimer.Enabled = true;
-                Logger.Trace("{changeID} :: Started ANIMATION", Global.ChangeIDBeingProcessed);
+                Logger.Trace("Started ANIMATION");
             }
             else
                 throw new Exception("loadingIconAnimationTimer is already enabled to why the request to enable again ?");
@@ -502,7 +521,7 @@ namespace NetworkAssistantNamespace
             if (loadingIconAnimationTimer.Enabled == true)
             {
                 loadingIconAnimationTimer.Enabled = false;
-                Logger.Trace("{changeID} :: Stopped ANIMATION", Global.ChangeIDBeingProcessed);
+                Logger.Trace("Stopped ANIMATION");
             }
             else
                 throw new Exception("loadingIconAnimationTimer is already disabled to why the request to disable again ?");
@@ -517,12 +536,5 @@ namespace NetworkAssistantNamespace
 
             trayIcon.Icon = loadingIcons[currentDisplayedLoadingIconIndex];
         }
-    }
-
-    enum CurrentConnectionType
-    {
-        None,
-        Ethernet,
-        WiFi
     }
 }

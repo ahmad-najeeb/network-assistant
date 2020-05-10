@@ -33,14 +33,28 @@ namespace NetworkAssistantNamespace
         {   
         }
 
-        public static void LoadSettingsFromFile()
+        public static void LoadSettingsFromFile(ref bool anyPersistedConfigRepaired)
         {
             string configFilePath = Global.AppDataDirectory + "\\" + Global.ConfigFilename;
             Global.AppSettings = new Settings();
 
             string configFileString = File.ReadAllText(configFilePath);
             JsonConvert.PopulateObject(configFileString, Global.AppSettings);
+            anyPersistedConfigRepaired = Global.AppSettings.Repair();
             Global.AppSettings.NetworkInterfaceSwitchingEnabled = Global.AppSettings.AutoEnableSwitcherOnStartup;
+        }
+
+        bool Repair()
+        {
+            bool anyPersistedConfigRepaired = false;
+
+            if (EthernetInterface != null && EthernetInterface.RepairConfig(InterfaceType.Ethernet) == true)
+                anyPersistedConfigRepaired = true;
+
+            if (WifiInterface != null && WifiInterface.RepairConfig(InterfaceType.WiFi) == true)
+                anyPersistedConfigRepaired = true;
+
+            return anyPersistedConfigRepaired;
         }
 
         public bool AreAllSettingsValidAndPresent()
@@ -83,7 +97,7 @@ namespace NetworkAssistantNamespace
         }
         */
 
-        void WriteSettings()
+        public void WriteSettings()
         {
             string json = JsonConvert.SerializeObject(Global.AppSettings, Formatting.Indented);
 
