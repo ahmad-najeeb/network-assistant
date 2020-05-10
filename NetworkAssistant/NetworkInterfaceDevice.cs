@@ -14,7 +14,7 @@ namespace NetworkAssistantNamespace
         public static List<NetworkInterfaceDevice> AllEthernetNetworkInterfaces = null;
         public static List<NetworkInterfaceDevice> AllWifiNetworkInterfaces = null;
 
-        static readonly NLog.Logger Logger = NLog.LogManager.GetCurrentClassLogger();
+        static readonly Logger Logger = LogManager.GetCurrentClassLogger();
 
         const int ethernetInterfaceTypeId = 6;
         const int wifiInterfaceTypeId = 71;
@@ -72,11 +72,15 @@ namespace NetworkAssistantNamespace
             deviceName = managementObject[managementObjectTagForNetworkInterfaceDeviceName].ToString();
             this.interfaceType = interfaceType;
             physicalAddress = managementObject[managementObjectTagForMACAddress].ToString();
+            LogThis(LogLevel.Debug, "Created NetworkInterfaceDevice .. Loading current status values ...");
+
             LoadCurrentStatusValues(managementObject);
+
         }
 
         public override string ToString()
         {
+            LogThis(LogLevel.Trace, "Returning ToString() value ...");
             if (CurrentState > InterfaceState.DevicePhysicallyDisconnected)
                 return $"Device: {deviceName} | MAC: {physicalAddress}";
             else
@@ -85,8 +89,6 @@ namespace NetworkAssistantNamespace
 
         public static void LoadAllNetworkInterfaces()
         {
-            //Logger.Info("Loading all network interfaces ...");
-
             LogThisStatic(LogLevel.Info, "Loading all network interfaces ...");
 
             (AllEthernetNetworkInterfaces, AllWifiNetworkInterfaces) =
@@ -122,11 +124,6 @@ namespace NetworkAssistantNamespace
 
         public void RefreshCurrentStatus()
         {
-            /*
-            Logger.WithProperty(Global.LoggingVarNames.InterfaceType, interfaceType.GetDescriptionString())
-                .Trace("Refreshing current status ...");
-            */
-
             LogThis(LogLevel.Trace, "Refreshing current status ...");
 
             LoadCurrentStatusValues(GetNetAdapterManagementObject());
@@ -136,17 +133,6 @@ namespace NetworkAssistantNamespace
         {
             LogThis(LogLevel.Trace, "Determing if change is needed ...",
                 Global.Pair(Global.LoggingVarNames.ChangeType, changeNeeded.GetDescriptionString()));
-
-            /*
-
-            Logger.Trace("{adapterType} :: Determing if change {changeType} is needed ...",
-                interfaceType.ToString(), changeNeeded.ToString());
-
-            Logger.Trace("{changeID}-{adapterType}-{changeType} :: Determing if change is needed ...",
-                Global.ChangeIDBeingProcessed, interfaceType.GetDescriptionString(),
-                changeNeeded.ToString());
-
-            */
 
             bool doTheChange = false;
 
@@ -162,24 +148,8 @@ namespace NetworkAssistantNamespace
                         LogThis(LogLevel.Trace, "Need to perform change ...",
                 Global.Pair(Global.LoggingVarNames.ChangeType, changeNeeded.GetDescriptionString()));
 
-                        /*
-
-                        Logger.Trace("{changeID}-{adapterType}-{changeType} :: Need to perform change ...",
-                Global.ChangeIDBeingProcessed, interfaceType.GetDescriptionString(),
-                changeNeeded.ToString());
-
-                        */
                         doTheChange = true;
                     }
-                    /*
-                    else if (changeNeeded == InterfaceChangeNeeded.Disable && CurrentState > InterfaceState.Disabled)
-                    {
-                        Logger.Trace("{changeID}-{adapterType}-{changeType} :: Need to perform change ...",
-                Global.ChangeIDBeingProcessed, interfaceType.GetDescriptionString(),
-                changeNeeded.ToString());
-                        doTheChange = true;
-                    }
-                    */
                 }
                 else
                     throw new Exception("ERROR hb2e86 :: Device not connected so cannot change state.");
@@ -189,26 +159,12 @@ namespace NetworkAssistantNamespace
                     LogThis(LogLevel.Trace, "Doing change ...",
                 Global.Pair(Global.LoggingVarNames.ChangeType, changeNeeded.GetDescriptionString()));
 
-                    /*
-                    Logger.Trace("{changeID}-{adapterType}-{changeType} :: Doing change ...",
-                        Global.ChangeIDBeingProcessed, interfaceType.GetDescriptionString(),
-                changeNeeded.ToString());
-
-                    */
-
                     Global.Controller.StopNetworkChangeMonitoring();
 
                     LogThis(LogLevel.Trace, "Executing change command ...",
                 Global.Pair(Global.LoggingVarNames.ChangeType, changeNeeded.GetDescriptionString()));
 
-                    /*
-
-                    Logger.Trace("{changeID}-{adapterType}-{changeType} :: Executing change command ...",
-                        Global.ChangeIDBeingProcessed, interfaceType.GetDescriptionString(),
-                changeNeeded.ToString());
-
-                    */
-
+                    
                     ProcessStartInfo psi = new ProcessStartInfo()
                     {
                         FileName = "netsh",
@@ -228,27 +184,15 @@ namespace NetworkAssistantNamespace
 
                     LogThis(LogLevel.Trace, "Change done",
                 Global.Pair(Global.LoggingVarNames.ChangeType, changeNeeded.GetDescriptionString()));
-                    /*
-                    Logger.Trace("{changeID}-{adapterType}-{changeType} :: Change done",
-                        Global.ChangeIDBeingProcessed, interfaceType.GetDescriptionString(),
-                changeNeeded.ToString());
-                    */
 
-
+                    LogThis(LogLevel.Trace, "Refreshing status",
+                Global.Pair(Global.LoggingVarNames.ChangeType, changeNeeded.GetDescriptionString()));
                     RefreshCurrentStatus();
                 }
                 else
                 {
                     LogThis(LogLevel.Trace, "Proposed change is actually NOT needed",
                 Global.Pair(Global.LoggingVarNames.ChangeType, changeNeeded.GetDescriptionString()));
-
-                    /*
-
-                    Logger.Trace("{changeID}-{adapterType}-{changeType} :: Proposed change is actually NOT needed ...",
-                        Global.ChangeIDBeingProcessed, interfaceType.GetDescriptionString(),
-                changeNeeded.ToString());
-
-                    */
                 }
             }
 
@@ -258,11 +202,6 @@ namespace NetworkAssistantNamespace
         ManagementObject GetNetAdapterManagementObject()
         {
             LogThis(LogLevel.Trace, "Getting Management object ...");
-
-            /*
-            Logger.Trace("{changeID}-{adapterType} :: Getting Management object ...",
-                Global.ChangeIDBeingProcessed, interfaceType.GetDescriptionString());
-            */
 
             var objectSearcher = new ManagementObjectSearcher("root\\StandardCimv2", $@"select * from MSFT_NetAdapter"); //Physical adapter
 
@@ -278,14 +217,11 @@ namespace NetworkAssistantNamespace
                 if (collection.Count == 0) //Device isn't currently connected to host machine
                 {
                     LogThis(LogLevel.Trace, "Management object count is zero - returning null ...");
-                    /*
-                    Logger.Trace("{changeID}-{adapterType} :: Management object count is zero - returning null ...",
-                Global.ChangeIDBeingProcessed, interfaceType.GetDescriptionString());
-                    */
                     return null;
                 }
                 else
                 {
+                    LogThis(LogLevel.Trace, "Return Management object ...");
                     var enumerator = collection.GetEnumerator();
                     enumerator.MoveNext();
                     return (ManagementObject)enumerator.Current;
@@ -296,59 +232,34 @@ namespace NetworkAssistantNamespace
         void LoadCurrentStatusValues(ManagementObject managementObject)
         {
             LogThis(LogLevel.Trace, "Loading current state values ...");
-            /*
-            Logger.Trace("{changeID}-{adapterType} :: Loading current state values ...",
-                Global.ChangeIDBeingProcessed, interfaceType.GetDescriptionString());
-
-            */
-
+            
             if (managementObject != null)
             {
                 //Check if device is enabled:
                 if (Int32.Parse(managementObject[managementObjectTagForCheckingIfNetworkInterfaceIsEnabled].ToString()) == 1)
                 {
-                    /*
-                    Logger.Trace("{changeID}-{adapterType} :: Device is enabled ...",
-                Global.ChangeIDBeingProcessed, interfaceType.GetDescriptionString());
-                    */
                     LogThis(LogLevel.Trace, "Device is enabled ...");
 
                     //Check if device has network connectivity:
                     if (Int32.Parse(managementObject[managementObjectTagForCheckingIfThereIsNetworkConnectivity].ToString()) == 1)
                     {
-                        /*
-                        Logger.Trace("{changeID}-{adapterType} :: Device has network connectivity ...",
-                Global.ChangeIDBeingProcessed, interfaceType.GetDescriptionString());
-                        */
                         LogThis(LogLevel.Trace, "Device has network connectivity ...");
                         CurrentState = InterfaceState.HasNetworkConnectivity;
                     }
                     else
                     {
-                        /*
-                        Logger.Trace("{changeID}-{adapterType} :: Device has no network connectivity ...",
-                Global.ChangeIDBeingProcessed, interfaceType.GetDescriptionString());
-                        */
                         LogThis(LogLevel.Trace, "Device has no network connectivity ...");
                         CurrentState = InterfaceState.EnabledButNoNetworkConnectivity;
                     }
                 }
                 else
                 {
-                    /*
-                    Logger.Trace("{changeID}-{adapterType} :: Device is disabled ...",
-                Global.ChangeIDBeingProcessed, interfaceType.GetDescriptionString());
-                    */
                     LogThis(LogLevel.Trace, "Device is disabled ...");
                     CurrentState = InterfaceState.Disabled;
                 }
             }
             else
             {
-                /*
-                Logger.Trace("{changeID}-{adapterType} :: Device is physically disconnected ...",
-                Global.ChangeIDBeingProcessed, interfaceType.GetDescriptionString());
-                */
                 LogThis(LogLevel.Trace, "Device is physically disconnected ...");
                 CurrentState = InterfaceState.DevicePhysicallyDisconnected;
             }
@@ -356,6 +267,8 @@ namespace NetworkAssistantNamespace
 
         static (List<NetworkInterfaceDevice>, List<NetworkInterfaceDevice>) GetEthernetAndWifiTypeNetworkInterfaces()
         {
+            LogThisStatic(LogLevel.Trace, $"Getting {InterfaceType.Ethernet.GetDescriptionString()} and {InterfaceType.WiFi.GetDescriptionString()} interfaces ...");
+
             List<NetworkInterfaceDevice> ethernetOptions = new List<NetworkInterfaceDevice>();
             List<NetworkInterfaceDevice> wifiOptions = new List<NetworkInterfaceDevice>();
 
@@ -363,6 +276,8 @@ namespace NetworkAssistantNamespace
             {
                 using (var managementObjectCollection = searcher.Get())
                 {
+                    LogThisStatic(LogLevel.Trace, $"Got Management Object collection containing {managementObjectCollection.Count} items ...");
+
                     foreach (var managementObject in managementObjectCollection)
                     {
                         if (Int32.Parse(managementObject[managementObjectTagForCheckingInterfaceType].ToString())
@@ -375,6 +290,8 @@ namespace NetworkAssistantNamespace
                 }
             }
 
+            LogThisStatic(LogLevel.Trace, "Finding previous interface selections...");
+
             FindPreviousInterfaceIfAnyAndAddIfNeeded(ethernetOptions, InterfaceType.Ethernet);
             FindPreviousInterfaceIfAnyAndAddIfNeeded(wifiOptions, InterfaceType.WiFi);
 
@@ -383,6 +300,9 @@ namespace NetworkAssistantNamespace
 
         static void FindPreviousInterfaceIfAnyAndAddIfNeeded(List<NetworkInterfaceDevice> existingDevices, InterfaceType interfaceType)
         {
+            LogThisStatic(LogLevel.Trace, $"Finding previous {interfaceType.GetDescriptionString()} selection ...");
+
+
             if (Global.AppSettings != null
                 && ((interfaceType == InterfaceType.Ethernet && Global.AppSettings.EthernetInterface != null)
                 || (interfaceType == InterfaceType.WiFi && Global.AppSettings.WifiInterface != null)))
@@ -401,6 +321,8 @@ namespace NetworkAssistantNamespace
                     int index;
                     if ((index = existingDevices.IndexOf(deviceToConsider)) != -1)
                     {
+                        LogThisStatic(LogLevel.Trace, $"Previous {interfaceType.GetDescriptionString()} device is WAS NOT found ...");
+
                         existingDevices.ElementAt(index).DoNotAutoDiscard = deviceToConsider.DoNotAutoDiscard;
                         if (interfaceType == InterfaceType.Ethernet)
                             Global.AppSettings.EthernetInterface = existingDevices.ElementAt(index);
@@ -409,6 +331,8 @@ namespace NetworkAssistantNamespace
                     }
                     else
                     {
+                        LogThisStatic(LogLevel.Trace, $"Previous {interfaceType.GetDescriptionString()} device is WAS found ...");
+
                         if (deviceToConsider.DoNotAutoDiscard == true)
                         {
                             deviceToConsider.CurrentState = InterfaceState.DevicePhysicallyDisconnected;
@@ -423,11 +347,16 @@ namespace NetworkAssistantNamespace
                         }
                     }
                 }
+                else
+                {
+                    LogThisStatic(LogLevel.Warn, $"Previous {interfaceType.GetDescriptionString()} device is null...");
+                }
             }
         }
 
         public bool RepairConfig(InterfaceType interfaceType)
         {
+            LogThis(LogLevel.Trace, "Attempting device-specific config repair");
             bool anyPersistedConfigRepaired = false;
 
             if (this.interfaceType != interfaceType)
@@ -436,6 +365,7 @@ namespace NetworkAssistantNamespace
                 anyPersistedConfigRepaired = true;
             }
 
+            LogThis(LogLevel.Trace, $"Repair done: {anyPersistedConfigRepaired}");
             return anyPersistedConfigRepaired;
         }
 
@@ -444,17 +374,18 @@ namespace NetworkAssistantNamespace
             LogThisStatic(level: level, message: message, properties: properties, callerMethodName: new StackFrame(1).GetMethod().Name, device: this);
         }
 
-        private static void LogThisStatic(LogLevel level, string message, string callerMethodName = null, NetworkInterfaceDevice device = null, params KeyValuePair<string, string>[] properties)
+        private static void LogThisStatic(LogLevel level, string message, string callerMethodName = null, int? callDepth = null, NetworkInterfaceDevice device = null, params KeyValuePair<string, string>[] properties)
         {
+            int callDepthToUse = callDepth.HasValue ? callDepth.Value : (new StackTrace()).FrameCount;
             if (device != null)
             {
-                Global.Log(Logger, level, message, properties,
+                Global.Log(Logger, level, message, callDepthToUse, properties,
                 Global.Pair(Global.LoggingVarNames.InterfaceType, device.interfaceType.GetDescriptionString()),
                 Global.Pair(Global.LoggingVarNames.CallerMethodName, callerMethodName ?? new StackFrame(1).GetMethod().Name));
             }
             else
             {
-                Global.Log(Logger, level, message, properties);
+                Global.Log(Logger, level, message, callDepthToUse, properties);
             }
         }
     }

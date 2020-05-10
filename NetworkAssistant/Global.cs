@@ -2,7 +2,9 @@
 using System;
 using System.Collections.Generic;
 using System.ComponentModel;
+using System.Linq;
 using System.Reflection;
+using System.Text;
 
 namespace NetworkAssistantNamespace
 {
@@ -27,6 +29,7 @@ namespace NetworkAssistantNamespace
             public const string InterfaceType = "interfaceType";
             public const string ChangeType = "changeType";
             public const string CallerMethodName = "callerMethodName";
+            public const string SpaceName = "spaceName";
         }
 
         public static string GetDescriptionString(this Enum en)
@@ -43,7 +46,7 @@ namespace NetworkAssistantNamespace
             return en.ToString();
         }
 
-        public static void Log(Logger logger, LogLevel level, string message,
+        public static void Log(Logger logger, LogLevel level, string message, int callDepth,
             KeyValuePair<string, string>[] originalProperties, params KeyValuePair<string, string>[] additionalProperties)
         {
             LogEventInfo eventInfo = new LogEventInfo(level, logger.Name, message);
@@ -54,7 +57,17 @@ namespace NetworkAssistantNamespace
             foreach (KeyValuePair<string, string> pair in additionalProperties)
                 eventInfo.Properties[pair.Key] = pair.Value;
 
+            eventInfo.Properties[LoggingVarNames.SpaceName] = GetSpace(callDepth);
+
             logger.Log(eventInfo);
+        }
+
+        static string GetSpace(int callDepth)
+        {
+            if (callDepth > 0)
+                return GetSpace(callDepth - 1) + "  ";
+            else
+                return "";
         }
 
         public static KeyValuePair<string, string> Pair(string key, string value)
@@ -62,18 +75,4 @@ namespace NetworkAssistantNamespace
             return new KeyValuePair<string, string>(key, value);
         }
     }
-
-    /*
-
-    public enum LogLevel
-    {
-        Trace,
-        Debug,
-        Info,
-        Warn,
-        Error,
-        Fatal
-    }
-
-    */
 }

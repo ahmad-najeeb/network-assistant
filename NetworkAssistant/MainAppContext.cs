@@ -52,14 +52,6 @@ namespace NetworkAssistantNamespace
         {
             Logger.Info("Initialization started");
 
-            MessageBox.Show(LogManager.Configuration.Variables["logLevelMaxLength"].ToString());
-
-            LogManager.Configuration.Variables["logLevelMaxLength"] = "10";
-
-            MessageBox.Show(LogManager.Configuration.Variables["logLevelMaxLength"].ToString());
-
-            LogManager.ReconfigExistingLoggers();
-
             Thread.Sleep(500);
 
             if (RunningAsAdministrator())
