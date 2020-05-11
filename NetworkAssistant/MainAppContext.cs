@@ -51,13 +51,13 @@ namespace NetworkAssistantNamespace
 
         void Init()
         {
-            LogThis(LogLevel.Info, "Initialization started");
-            LogThis(LogLevel.Info, "Initialization started");
-
+            LogThis(LogLevel.Info, "-> Initialize");
+            
             Thread.Sleep(500);
 
             if (RunningAsAdministrator())
             {
+                LogThis(LogLevel.Debug, "Running with administrative privileges");
                 try
                 {
                     //Create app data directory if it does not exist
@@ -73,7 +73,13 @@ namespace NetworkAssistantNamespace
                 //TODO: Write icons to bin output if not present
                 loadingIcons = GenerateLoadingIcons(Resources.LoadingIconTemplate, numberOfLoadingAnimationFramesNeeded);
 
+                LogThis(LogLevel.Debug, "Loading settings ...");
+
                 LoadSettings();
+
+                LogThis(LogLevel.Debug, "Intializing system tray menu ...");
+
+
                 InitializeSystemTrayMenu();
                 //RefreshSystemTrayMenu();
                 trayIcon.Visible = true;
@@ -81,6 +87,8 @@ namespace NetworkAssistantNamespace
 
                 if (Global.AppSettings.NetworkInterfaceSwitchingEnabled == true)
                 {
+                    LogThis(LogLevel.Debug, "Initiating post-init change detection ...");
+
                     TriggerManualChangeDetection();
                     //RefreshSystemTrayMenu();
                     //UpdateSystemTrayIconAndTooltipOnly();
@@ -105,7 +113,7 @@ namespace NetworkAssistantNamespace
 
         public void RefreshSystemTrayMenu()
         {
-            LogThis(LogLevel.Trace, "Refreshing system tray menu ...");
+            LogThis(LogLevel.Debug, "-> Refresh system tray menu ...");
 
             enabledMenuItem.Checked = Global.AppSettings.NetworkInterfaceSwitchingEnabled.Value;
 
@@ -121,14 +129,14 @@ namespace NetworkAssistantNamespace
             }
 
             UpdateSystemTrayIconAndTooltipOnly();
+
+            LogThis(LogLevel.Debug, "System tray menu refresh done");
+
         }
 
         void DoExitRoutine(bool doImmediateExit)
         {
-            if (doImmediateExit)
-                LogThis(LogLevel.Info, "Shutting down immediately ...");
-            else
-                LogThis(LogLevel.Info, "Shutting down ...");
+            LogThis(LogLevel.Info, $"-> Exit - immediately: {doImmediateExit} ...");
 
             if (loadingIcons != null)
                 foreach (Icon loadingIcon in loadingIcons)
@@ -160,8 +168,10 @@ namespace NetworkAssistantNamespace
 
         void ToggleNetworkInterfaceSwitching(object sender, EventArgs e)
         {
+            LogThis(LogLevel.Debug, "-> Network switching toggled ...");
+
             Global.AppSettings.NetworkInterfaceSwitchingEnabled = !Global.AppSettings.NetworkInterfaceSwitchingEnabled;
-            LogThis(LogLevel.Info, "Network switching has been" + (Global.AppSettings.NetworkInterfaceSwitchingEnabled == true ? "ENABLED" : "DISABLED"));
+            LogThis(LogLevel.Debug, "Network switching has been" + (Global.AppSettings.NetworkInterfaceSwitchingEnabled == true ? "ENABLED" : "DISABLED"));
 
             if (Global.AppSettings.NetworkInterfaceSwitchingEnabled.Value == true)
             {
@@ -175,38 +185,53 @@ namespace NetworkAssistantNamespace
                 RefreshSystemTrayMenu();
             }
 
+            LogThis(LogLevel.Debug, "Network switching toggle event handling done");
+
             //RefreshSystemTrayMenu(); //This is not needed because TriggerManualChangeDetection() already executes it at the end
         }
 
         void DisplaySettingsWindow(object sender, EventArgs e)
         {
-            LogThis(LogLevel.Info, "Displaying Settings menu ...");
+            LogThis(LogLevel.Debug, "-> Display Settings dialog ...");
             bool changesDone = Global.AppSettings.ShowSettingsForm(false);
+
+            LogThis(LogLevel.Debug, $"Out of Settings dialog - Changes done: {changesDone}");
+
 
             if (changesDone)
             {
+                LogThis(LogLevel.Debug, "Refreshing system tray menu because changes were done ...");
                 RefreshSystemTrayMenu();
-            }   
+            }
+            LogThis(LogLevel.Debug, "Display settings dialog user request handling done");
+
         }
 
         InterfaceType GetRefreshedConnectivityState()
         {
-            LogThis(LogLevel.Info, "Calculating current connectivity state ...");
+            LogThis(LogLevel.Debug, "-> Calculate current connectivity state ...");
             Global.AppSettings.EthernetInterface.RefreshCurrentStatus();
             Global.AppSettings.WifiInterface.RefreshCurrentStatus();
+
+            InterfaceType currentState;
 
             if (Global.AppSettings.EthernetInterface.CurrentState > InterfaceState.EnabledButNoNetworkConnectivity
                 || Global.AppSettings.WifiInterface.CurrentState >= InterfaceState.EnabledButNoNetworkConnectivity)
                 if (Global.AppSettings.EthernetInterface.CurrentState > InterfaceState.EnabledButNoNetworkConnectivity)
-                    return InterfaceType.Ethernet;
+                    currentState = InterfaceType.Ethernet;
                 else
-                    return InterfaceType.WiFi;
+                    currentState = InterfaceType.WiFi;
             else
-                return InterfaceType.None;
+                currentState = InterfaceType.None;
+
+            LogThis(LogLevel.Debug, $"Current connectivity state calulation done: {currentState.GetDescriptionString()}");
+            return currentState;
         }
 
         void ValidateNetworkDeviceChoicesAndSettings(bool doingInitialSettingsLoad = false)
         {
+            LogThis(LogLevel.Debug, "-> Valid device choices and settings ...");
+
             NetworkInterfaceDevice.LoadAllNetworkInterfaces();
 
             if (doingInitialSettingsLoad
@@ -223,11 +248,12 @@ namespace NetworkAssistantNamespace
                     MessageBox.Show("You need to re-choose one or both network interfaces");
                 Global.AppSettings.ShowSettingsForm(true);
             }
+            LogThis(LogLevel.Debug, "Device choices and settings validation done");
         }
-        
+
         void LoadSettings()
         {
-            LogThis(LogLevel.Info, "Loading settings ...");
+            LogThis(LogLevel.Info, "-> Load settings ...");
 
             bool anyPersistedConfigRepaired = false;
 
@@ -243,17 +269,21 @@ namespace NetworkAssistantNamespace
 
         void ChangeEventHandler(object sender, EventArgs e)
         {
-            LogThis(LogLevel.Trace, "Received change event fire -- spawning thread");
+            LogThis(LogLevel.Trace, "-> Received change event fire -- spawning thread");
 
             Thread t = new Thread(new ParameterizedThreadStart(CreateChangeRequest_Common));
+            LogThis(LogLevel.Trace, "Starting thread");
+
             t.Start(new List<object> { true, sender, e });
         }
 
         void CreateChangeRequest_Common(object changeData)
         {
+            LogThis(LogLevel.Debug, $"-> Initiating COMMON change handling ...");
+
             string localChangeID = GenerateChangeID();
-            
-            LogThis(LogLevel.Trace, $"Initiating COMMON change handling: {localChangeID}L");
+
+            LogThis(LogLevel.Trace, $"Local Change ID generated: {localChangeID}L");
 
             List<object> changeDataList = (List<object>)changeData;
 
@@ -297,11 +327,15 @@ namespace NetworkAssistantNamespace
             {
                 Logger.Warn("Locked out: Another change being serviced: {changeID}");
             }
+
+            LogThis(LogLevel.Debug, $"Change handling done - ending thread ...");
+
+            Thread.CurrentThread.Abort(); //TODO: Check if this is the best way to end the thread
         }
 
         void TriggerManualChangeDetection()
         {
-            LogThis(LogLevel.Trace, "Received manual change detection request -- spawning thread");
+            LogThis(LogLevel.Trace, "-> Received manual change detection request -- spawning thread");
 
             Thread t = new Thread(new ParameterizedThreadStart(CreateChangeRequest_Common));
             t.Start(new List<object> { false });
@@ -309,6 +343,8 @@ namespace NetworkAssistantNamespace
 
         void CheckForChangeAndPerformUpdatesIfNeeded()
         {
+            LogThis(LogLevel.Debug, "-> Check for device status change and apply changes if needed ...");
+
             LogThis(LogLevel.Trace, "(Re)loading Network Interfaces ...");
             ValidateNetworkDeviceChoicesAndSettings();
 
@@ -331,18 +367,20 @@ namespace NetworkAssistantNamespace
                 LogThis(LogLevel.Trace, "Ethernet has no connectivity so enabling Wi-Fi (if it's not already) ...");
                 Global.AppSettings.WifiInterface.ChangeStateIfNeeded(InterfaceChangeNeeded.Enable);
             }
+
+            LogThis(LogLevel.Debug, "Checking for device status changes done");
         }
 
         public static bool RunningAsAdministrator()
         {
-            LogThisStatic(LogLevel.Trace, "Checking if user running program has administrative privileges ...");
+            LogThisStatic(LogLevel.Trace, "-> Check if user running program has administrative privileges ...");
             return (new WindowsPrincipal(WindowsIdentity.GetCurrent()))
                       .IsInRole(WindowsBuiltInRole.Administrator);
         }
 
         void InitializeSystemTrayMenu()
         {
-            LogThis(LogLevel.Info, "Initializing system tray menu ...");
+            LogThis(LogLevel.Info, "-> Initialize system tray menu ...");
 
             trayIcon = new NotifyIcon();
 
@@ -367,10 +405,14 @@ namespace NetworkAssistantNamespace
                     settingsMenuItem,
                     exitMenuItem
                     });
+
+            LogThis(LogLevel.Info, "-> System tray menu initialization done");
         }
 
         void UpdateSystemTrayIconAndTooltipOnly()
         {
+            LogThis(LogLevel.Info, "-> Update system tray icon and tooltip ...");
+
             InterfaceType currentState = GetRefreshedConnectivityState();
             
             if (Global.AppSettings.NetworkInterfaceSwitchingEnabled.Value == true)
@@ -408,27 +450,33 @@ namespace NetworkAssistantNamespace
 
                 trayIcon.Icon = Resources.GenericSystemTrayIcon;
             }
+
+            LogThis(LogLevel.Info, "System tray icon and tooltip update done ...");
         }
 
         public void StartNetworkChangeMonitoring()
         {
+            LogThis(LogLevel.Info, "-> Monitor for network changes ...");
+
             NetworkChange.NetworkAddressChanged += new
                     NetworkAddressChangedEventHandler(ChangeEventHandler);
 
             currentlyListeningForChanges = true;
 
-            LogThis(LogLevel.Info, "*** STARTED listening for network changes ***");
+            LogThis(LogLevel.Info, "Started monitoring for network changes");
 
         }
 
         public void StopNetworkChangeMonitoring()
         {
+            LogThis(LogLevel.Info, "-> DON'T Monitor for network changes ...");
+
             NetworkChange.NetworkAddressChanged -= new
                     NetworkAddressChangedEventHandler(ChangeEventHandler);
 
             currentlyListeningForChanges = false;
 
-            LogThis(LogLevel.Info, "*** STOPPED listening for network changes ***");
+            LogThis(LogLevel.Info, "Stopped monitoring for network changes");
         }
 
         string GenerateChangeID()
@@ -448,6 +496,8 @@ namespace NetworkAssistantNamespace
 
         static Icon[] GenerateLoadingIcons(Bitmap templateLoadingImage, int numberOfNeededFrames)
         {
+            LogThisStatic(LogLevel.Info, "-> Generate loading icons ...");
+
             if (numberOfNeededFrames < 2)
                 throw new Exception("Invalid number of needed frames provided for loading icons generation: " + numberOfNeededFrames);
 
@@ -469,11 +519,15 @@ namespace NetworkAssistantNamespace
                 icons[i] = Icon.FromHandle(tmpBitmap.GetHicon());
             }
 
+            LogThisStatic(LogLevel.Info, "-> Loading icons generation done");
+
             return icons;
         }
 
         static Bitmap RotateImage(Bitmap bmp, float angle)
         {
+            LogThisStatic(LogLevel.Debug, "-> Rotate image ...");
+
             Bitmap rotatedImage = new Bitmap(bmp.Width, bmp.Height);
             rotatedImage.SetResolution(bmp.HorizontalResolution, bmp.VerticalResolution);
 
@@ -488,11 +542,15 @@ namespace NetworkAssistantNamespace
                 // Draw the image on the bitmap
                 g.DrawImage(bmp, new Point(0, 0));
             }
+            LogThisStatic(LogLevel.Debug, "-> Image rotation done");
+
             return rotatedImage;
         }
 
         void StartLoadingIconAnimation()
         {
+            LogThis(LogLevel.Debug, "-> Start loading icon animation ...");
+
             if (loadingIconAnimationTimer == null)
             {
                 loadingIconAnimationTimer = new System.Timers.Timer(1000 / loadingIcons.Length);
@@ -508,10 +566,13 @@ namespace NetworkAssistantNamespace
             else
                 throw new Exception("loadingIconAnimationTimer is already enabled to why the request to enable again ?");
             
+            LogThis(LogLevel.Debug, "Loading icon animation started ...");
         }
 
         void StopLoadingIconAnimation()
         {
+            LogThis(LogLevel.Debug, "-> Stop loading icon animation ...");
+
             if (loadingIconAnimationTimer.Enabled == true)
             {
                 loadingIconAnimationTimer.Enabled = false;
@@ -519,16 +580,22 @@ namespace NetworkAssistantNamespace
             }
             else
                 throw new Exception("loadingIconAnimationTimer is already disabled to why the request to disable again ?");
+
+            LogThis(LogLevel.Debug, "Loading icon animation stopped ...");
         }
 
         void LoadingIconRotationEvent(Object source, ElapsedEventArgs e)
         {
+            LogThis(LogLevel.Debug, "-> Loading icon animation timer fired ...");
+
             if (currentDisplayedLoadingIconIndex == -1)
                 currentDisplayedLoadingIconIndex = 0;
             else
                 currentDisplayedLoadingIconIndex = (currentDisplayedLoadingIconIndex + 1) % loadingIcons.Length;
 
             trayIcon.Icon = loadingIcons[currentDisplayedLoadingIconIndex];
+
+            LogThis(LogLevel.Debug, "Loading icon rotated due to timer fire");
         }
 
         private void LogThis(LogLevel level, string message, params KeyValuePair<string, string>[] properties)

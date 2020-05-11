@@ -48,6 +48,10 @@ namespace NetworkAssistantNamespace
 
         public bool IsValid()
         {
+            LogThis(LogLevel.Debug, "-> Check if device is valid (i.e. setup properly) ...");
+
+            bool isValid = true;
+
             if (String.IsNullOrWhiteSpace(windowsDeviceId)
                 || String.IsNullOrWhiteSpace(name)
                 || String.IsNullOrWhiteSpace(deviceName)
@@ -55,9 +59,12 @@ namespace NetworkAssistantNamespace
                 || CurrentState == null
                 || interfaceType == null
                 || DoNotAutoDiscard == null)
-                return false;
+                isValid = false;
             else
-                return true;
+                isValid = true;
+
+            LogThis(LogLevel.Debug, $"Check done - Device is valid: {isValid}");
+            return isValid;
         }
 
         public NetworkInterfaceDevice()
@@ -66,21 +73,24 @@ namespace NetworkAssistantNamespace
 
         public NetworkInterfaceDevice(ManagementObject managementObject, InterfaceType interfaceType, bool doNotAutoDiscard = false)
         {
+            LogThis(LogLevel.Debug, "-> Create new network device ...");
+
             this.DoNotAutoDiscard = doNotAutoDiscard;
             windowsDeviceId = managementObject[managementObjectTagForWindowsDeviceID].ToString();
             name = managementObject[managementObjectTagForNetworkInterfaceConnectionName].ToString();
             deviceName = managementObject[managementObjectTagForNetworkInterfaceDeviceName].ToString();
             this.interfaceType = interfaceType;
             physicalAddress = managementObject[managementObjectTagForMACAddress].ToString();
-            LogThis(LogLevel.Debug, "Created NetworkInterfaceDevice .. Loading current status values ...");
+            LogThis(LogLevel.Trace, "Created NetworkInterfaceDevice .. Loading current status values ...");
 
             LoadCurrentStatusValues(managementObject);
 
+            LogThis(LogLevel.Debug, "Current status loaded - Network device creation fully complete");
         }
 
         public override string ToString()
         {
-            LogThis(LogLevel.Trace, "Returning ToString() value ...");
+            LogThis(LogLevel.Trace, "-> Return ToString() value ...");
             if (CurrentState > InterfaceState.DevicePhysicallyDisconnected)
                 return $"Device: {deviceName} | MAC: {physicalAddress}";
             else
@@ -89,7 +99,7 @@ namespace NetworkAssistantNamespace
 
         public static void LoadAllNetworkInterfaces()
         {
-            LogThisStatic(LogLevel.Info, "Loading all network interfaces ...");
+            LogThisStatic(LogLevel.Info, "-> Load all network devices ...");
 
             (AllEthernetNetworkInterfaces, AllWifiNetworkInterfaces) =
                 GetEthernetAndWifiTypeNetworkInterfaces();
@@ -97,24 +107,29 @@ namespace NetworkAssistantNamespace
 
         public override bool Equals(object obj)
         {
+            LogThis(LogLevel.Debug, "-> Equals ...");
+
+            bool isEquals = true; //assumptions
+
             if (obj == null)
-                return false;
+                isEquals = false;
+            else if (obj.GetType() != typeof(NetworkInterfaceDevice))
+                isEquals = false;
+            else
+            {
+                NetworkInterfaceDevice otherDevice = (NetworkInterfaceDevice)obj;
 
-            if (obj.GetType() != typeof(NetworkInterfaceDevice))
-                return false;
+                if (this.windowsDeviceId != otherDevice.windowsDeviceId)
+                    isEquals = false;
+                else if (this.deviceName != otherDevice.deviceName)
+                    isEquals = false;
+                else if (this.physicalAddress != otherDevice.physicalAddress)
+                    isEquals = false;
+            }
 
-            NetworkInterfaceDevice otherDevice = (NetworkInterfaceDevice)obj;
+            LogThis(LogLevel.Debug, $"Equals comparison done - Returning: {isEquals}");
 
-            if (this.windowsDeviceId != otherDevice.windowsDeviceId)
-                return false;
-
-            if (this.deviceName != otherDevice.deviceName)
-                return false;
-
-            if (this.physicalAddress != otherDevice.physicalAddress)
-                return false;
-
-            return true;
+            return isEquals;
         }
 
         public override int GetHashCode()
@@ -124,20 +139,25 @@ namespace NetworkAssistantNamespace
 
         public void RefreshCurrentStatus()
         {
-            LogThis(LogLevel.Trace, "Refreshing current status ...");
+            LogThis(LogLevel.Debug, "-> Refresh current status ...");
 
             LoadCurrentStatusValues(GetNetAdapterManagementObject());
+
+            LogThis(LogLevel.Debug, "Refresh current status done");
         }
 
         public bool ChangeStateIfNeeded(InterfaceChangeNeeded changeNeeded)
         {
-            LogThis(LogLevel.Trace, "Determing if change is needed ...",
+            LogThis(LogLevel.Trace, "-> Determine if change is needed ...",
                 Global.Pair(Global.LoggingVarNames.ChangeType, changeNeeded.GetDescriptionString()));
 
             bool doTheChange = false;
 
             if (changeNeeded != InterfaceChangeNeeded.Nothing)
             {
+                LogThis(LogLevel.Trace, "Refreshing current device status ...",
+                Global.Pair(Global.LoggingVarNames.ChangeType, changeNeeded.GetDescriptionString()));
+
                 RefreshCurrentStatus();
 
                 if (CurrentState > InterfaceState.DevicePhysicallyDisconnected)
@@ -157,6 +177,9 @@ namespace NetworkAssistantNamespace
                 if (doTheChange)
                 {
                     LogThis(LogLevel.Trace, "Doing change ...",
+                Global.Pair(Global.LoggingVarNames.ChangeType, changeNeeded.GetDescriptionString()));
+
+                    LogThis(LogLevel.Trace, "Stop network change detection ...",
                 Global.Pair(Global.LoggingVarNames.ChangeType, changeNeeded.GetDescriptionString()));
 
                     Global.Controller.StopNetworkChangeMonitoring();
@@ -180,6 +203,9 @@ namespace NetworkAssistantNamespace
                         p.WaitForExit();
                     }
 
+                    LogThis(LogLevel.Trace, "Resume network change detection ...",
+                Global.Pair(Global.LoggingVarNames.ChangeType, changeNeeded.GetDescriptionString()));
+
                     Global.Controller.StartNetworkChangeMonitoring();
 
                     LogThis(LogLevel.Trace, "Change done",
@@ -195,13 +221,21 @@ namespace NetworkAssistantNamespace
                 Global.Pair(Global.LoggingVarNames.ChangeType, changeNeeded.GetDescriptionString()));
                 }
             }
+            else
+            {
+                LogThis(LogLevel.Debug, $"Change reported is {changeNeeded.GetDescriptionString()}",
+                Global.Pair(Global.LoggingVarNames.ChangeType, changeNeeded.GetDescriptionString()));
+            }
+
+            LogThis(LogLevel.Debug, $"Device-specific change request servicing done - Change done: ${doTheChange}",
+                Global.Pair(Global.LoggingVarNames.ChangeType, changeNeeded.GetDescriptionString()));
 
             return doTheChange;
         }
 
         ManagementObject GetNetAdapterManagementObject()
         {
-            LogThis(LogLevel.Trace, "Getting Management object ...");
+            LogThis(LogLevel.Debug, "-> Get Management object ...");
 
             var objectSearcher = new ManagementObjectSearcher("root\\StandardCimv2", $@"select * from MSFT_NetAdapter"); //Physical adapter
 
@@ -216,12 +250,12 @@ namespace NetworkAssistantNamespace
 
                 if (collection.Count == 0) //Device isn't currently connected to host machine
                 {
-                    LogThis(LogLevel.Trace, "Management object count is zero - returning null ...");
+                    LogThis(LogLevel.Debug, "Management object count is zero - returning null ...");
                     return null;
                 }
                 else
                 {
-                    LogThis(LogLevel.Trace, "Return Management object ...");
+                    LogThis(LogLevel.Debug, "Return Management object ...");
                     var enumerator = collection.GetEnumerator();
                     enumerator.MoveNext();
                     return (ManagementObject)enumerator.Current;
@@ -231,43 +265,41 @@ namespace NetworkAssistantNamespace
 
         void LoadCurrentStatusValues(ManagementObject managementObject)
         {
-            LogThis(LogLevel.Trace, "Loading current state values ...");
+            LogThis(LogLevel.Debug, "-> Load current state values ...");
             
             if (managementObject != null)
             {
                 //Check if device is enabled:
                 if (Int32.Parse(managementObject[managementObjectTagForCheckingIfNetworkInterfaceIsEnabled].ToString()) == 1)
                 {
-                    LogThis(LogLevel.Trace, "Device is enabled ...");
-
                     //Check if device has network connectivity:
                     if (Int32.Parse(managementObject[managementObjectTagForCheckingIfThereIsNetworkConnectivity].ToString()) == 1)
                     {
-                        LogThis(LogLevel.Trace, "Device has network connectivity ...");
+                        LogThis(LogLevel.Debug, "Device is enabled and has network connectivity ...");
                         CurrentState = InterfaceState.HasNetworkConnectivity;
                     }
                     else
                     {
-                        LogThis(LogLevel.Trace, "Device has no network connectivity ...");
+                        LogThis(LogLevel.Debug, "Device is enabled but has no network connectivity ...");
                         CurrentState = InterfaceState.EnabledButNoNetworkConnectivity;
                     }
                 }
                 else
                 {
-                    LogThis(LogLevel.Trace, "Device is disabled ...");
+                    LogThis(LogLevel.Debug, "Device is disabled ...");
                     CurrentState = InterfaceState.Disabled;
                 }
             }
             else
             {
-                LogThis(LogLevel.Trace, "Device is physically disconnected ...");
+                LogThis(LogLevel.Debug, "Device is physically disconnected ...");
                 CurrentState = InterfaceState.DevicePhysicallyDisconnected;
             }
         }
 
         static (List<NetworkInterfaceDevice>, List<NetworkInterfaceDevice>) GetEthernetAndWifiTypeNetworkInterfaces()
         {
-            LogThisStatic(LogLevel.Trace, $"Getting {InterfaceType.Ethernet.GetDescriptionString()} and {InterfaceType.WiFi.GetDescriptionString()} interfaces ...");
+            LogThisStatic(LogLevel.Debug, $"-> Get all {InterfaceType.Ethernet.GetDescriptionString()} and {InterfaceType.WiFi.GetDescriptionString()} devices ...");
 
             List<NetworkInterfaceDevice> ethernetOptions = new List<NetworkInterfaceDevice>();
             List<NetworkInterfaceDevice> wifiOptions = new List<NetworkInterfaceDevice>();
@@ -290,18 +322,19 @@ namespace NetworkAssistantNamespace
                 }
             }
 
-            LogThisStatic(LogLevel.Trace, "Finding previous interface selections...");
+            LogThisStatic(LogLevel.Trace, "Finding previous network device selections...");
 
             FindPreviousInterfaceIfAnyAndAddIfNeeded(ethernetOptions, InterfaceType.Ethernet);
             FindPreviousInterfaceIfAnyAndAddIfNeeded(wifiOptions, InterfaceType.WiFi);
+
+            LogThisStatic(LogLevel.Debug, "Returning resultsets ...");
 
             return (ethernetOptions, wifiOptions);
         }
 
         static void FindPreviousInterfaceIfAnyAndAddIfNeeded(List<NetworkInterfaceDevice> existingDevices, InterfaceType interfaceType)
         {
-            LogThisStatic(LogLevel.Trace, $"Finding previous {interfaceType.GetDescriptionString()} selection ...");
-
+            LogThisStatic(LogLevel.Debug, $"-> Find previous {interfaceType.GetDescriptionString()} device selection ...");
 
             if (Global.AppSettings != null
                 && ((interfaceType == InterfaceType.Ethernet && Global.AppSettings.EthernetInterface != null)
@@ -356,7 +389,7 @@ namespace NetworkAssistantNamespace
 
         public bool RepairConfig(InterfaceType interfaceType)
         {
-            LogThis(LogLevel.Trace, "Attempting device-specific config repair");
+            LogThis(LogLevel.Debug, "-> Attempt repair of device-specific config (if needed)");
             bool anyPersistedConfigRepaired = false;
 
             if (this.interfaceType != interfaceType)
@@ -365,7 +398,7 @@ namespace NetworkAssistantNamespace
                 anyPersistedConfigRepaired = true;
             }
 
-            LogThis(LogLevel.Trace, $"Repair done: {anyPersistedConfigRepaired}");
+            LogThis(LogLevel.Debug, $"Repair done: {anyPersistedConfigRepaired}");
             return anyPersistedConfigRepaired;
         }
 
@@ -386,7 +419,7 @@ namespace NetworkAssistantNamespace
 
             additionalProperties[0] = new KeyValuePair<string, string>(Global.LoggingVarNames.CallerMethodName, callerMethodName ?? new StackFrame(1).GetMethod().Name);
             if (device != null)
-                additionalProperties[1] = new KeyValuePair<string, string>(Global.LoggingVarNames.InterfaceType, device.interfaceType.GetDescriptionString());
+                additionalProperties[1] = new KeyValuePair<string, string>(Global.LoggingVarNames.InterfaceType, device.interfaceType != null ? device.interfaceType.GetDescriptionString() : "NULL");
 
             Global.Log(Logger, level, message, callDepthToUse, properties, additionalProperties);
         }
